@@ -74,6 +74,17 @@ docker compose up --build
 
 Open <http://localhost:3000>.
 
+### In GitHub Codespaces
+
+The repo ships a devcontainer that installs `yt-dlp` and `ffmpeg` for you, so
+"Code → Codespaces → Create codespace" is enough to get running.
+
+> [!WARNING]
+> YouTube blocks datacenter IPs aggressively, and that is what Codespaces uses. Expect
+> `BLOCKED_BY_YOUTUBE` on many videos even though the app is working — see
+> [Troubleshooting](#troubleshooting). Codespaces is fine for working on the UI and the
+> API surface; do real downloads locally.
+
 ### Locally
 
 ```bash
@@ -269,6 +280,7 @@ Every failure returns the same envelope with a matching HTTP status:
 | `NO_MATCHING_FORMAT`                              | 422     | That quality does not exist          |
 | `PLAYLIST_TOO_LARGE`                              | 400     | Batch exceeds `MAX_PLAYLIST_ITEMS`   |
 | `RATE_LIMITED`                                    | 429     | Too many requests from your IP       |
+| `BLOCKED_BY_YOUTUBE`                              | 429     | YouTube refused this server's IP     |
 | `MISSING_BINARY`                                  | 503     | yt-dlp or ffmpeg not installed       |
 | `TIMEOUT`                                         | 504     | Exceeded `DOWNLOAD_TIMEOUT_MS`       |
 | `CONVERSION_FAILED`, `UNKNOWN`                    | 500/502 | Something else went wrong            |
@@ -328,12 +340,36 @@ sees with `curl localhost:3000/api/health`.
 </details>
 
 <details>
-<summary><strong>"YouTube is rate-limiting this server and asked for sign-in verification"</strong></summary>
+<summary><strong>"YouTube is blocking requests from this server" (HTTP 429)</strong></summary>
 
-YouTube is challenging your server's IP with a bot check. Wait a few minutes and try again.
-If it persists, export cookies from a browser where you are signed in and set
-`YT_DLP_COOKIES`. This is a rate-limit problem, not an authentication one — signing in does
-not grant you access to anything you did not already have.
+YouTube challenges or refuses traffic it judges to be automated, and it is far more
+aggressive about this from **datacenter IP addresses** — GitHub Codespaces, CI runners, and
+most cloud VMs. The app is working correctly; YouTube is simply refusing it.
+
+Options, best first:
+
+1. **Run it from a residential connection.** Local machine, home server, or a VPS on an IP
+   that has not been flagged.
+2. **Supply cookies.** Export `cookies.txt` from a browser where you are signed in and set
+   `YT_DLP_COOKIES` to its path. This proves you are a person, not a bot — it does not grant
+   access to anything your account did not already have.
+3. **Wait.** Short-lived challenges sometimes clear on their own.
+
+The exact yt-dlp message is written to the server log, which is worth reading — it
+distinguishes a block from a genuinely unavailable video.
+
+</details>
+
+<details>
+<summary><strong>A request fails with 502 and "yt-dlp couldn't process that video"</strong></summary>
+
+That is the catch-all for a yt-dlp failure with wording the app does not recognise. The
+full stderr is **logged server-side** (look for `[yt-dlp] exited with code …` in the
+terminal running the app); it is deliberately not returned to the browser, since it can
+contain filesystem paths.
+
+If the logged message looks like something the app should classify properly, please open an
+issue with it — `tests/errors.test.ts` pins these strings.
 
 </details>
 

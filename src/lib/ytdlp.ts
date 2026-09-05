@@ -100,6 +100,19 @@ async function runYtDlp({ args, timeoutMs, signal, onStdoutLine }: RunOptions): 
   });
 }
 
+/**
+ * yt-dlp's stderr is the only real diagnostic when a run fails, and the client
+ * deliberately never sees it (it can contain filesystem paths). Log it so the
+ * operator can, then map it to a safe user-facing error.
+ */
+function failFromStderr(stderr: string, code: number | null): AppError {
+  const detail = stderr.trim();
+  console.error(
+    `[yt-dlp] exited with code ${code ?? "null"}\n${detail.slice(-4000) || "(no stderr output)"}`,
+  );
+  return fromYtDlpStderr(detail, code);
+}
+
 /** Arguments shared by every invocation. */
 function baseArgs(): string[] {
   const args = [
@@ -162,7 +175,7 @@ interface RawInfo {
 async function dumpJson(args: string[], signal?: AbortSignal): Promise<RawInfo> {
   const result = await runYtDlp({ args, timeoutMs: INFO_TIMEOUT_MS, signal });
 
-  if (result.code !== 0) throw fromYtDlpStderr(result.stderr, result.code);
+  if (result.code !== 0) throw failFromStderr(result.stderr, result.code);
 
   try {
     return JSON.parse(result.stdout) as RawInfo;
@@ -483,7 +496,7 @@ export async function downloadMedia({
     },
   });
 
-  if (result.code !== 0) throw fromYtDlpStderr(result.stderr, result.code);
+  if (result.code !== 0) throw failFromStderr(result.stderr, result.code);
 
   const file = await findOutputFile(destDir);
   if (!file) {

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `BLOCKED_BY_YOUTUBE` error code (HTTP 429) covering the several wordings yt-dlp
+  produces when YouTube refuses a request — common from datacenter IPs such as
+  GitHub Codespaces and CI runners. These previously fell through to a bare 502.
+- Devcontainer that installs `yt-dlp` and `ffmpeg`, so the project runs in
+  Codespaces without manual setup.
+- App icon, so `/favicon.ico` no longer 404s.
+
+### Fixed
+
+- yt-dlp's stderr is now logged server-side on failure. It was discarded
+  entirely, which left an unrecognised failure with no diagnostic anywhere.
+- The generic 502 hint now says where to find the real error.
+
 ## [1.0.0] — 2026-09-05
 
 First release.

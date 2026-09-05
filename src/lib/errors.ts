@@ -88,11 +88,16 @@ const STDERR_PATTERNS: Array<{
     message: "That URL isn't a supported YouTube link.",
   },
   {
-    pattern: /confirm you'?re not a bot|sign in to confirm you'?re not a bot/i,
-    code: "UNKNOWN",
+    // YouTube challenges or refuses traffic it judges automated. This is the
+    // norm from a datacenter IP — Codespaces, CI runners, most cloud VMs — and
+    // it surfaces under several different wordings depending on which stage
+    // of extraction failed.
+    pattern:
+      /confirm you'?re not a bot|failed to extract any player response|all player responses are invalid|not available on this app|rate[- ]?limit reached|unable to download video data: HTTP Error 403/i,
+    code: "BLOCKED_BY_YOUTUBE",
     status: 429,
-    message: "YouTube is rate-limiting this server and asked for sign-in verification.",
-    hint: "Wait a few minutes and try again, or configure YT_DLP_COOKIES with your own exported cookies.",
+    message: "YouTube is blocking requests from this server.",
+    hint: "This is expected from a datacenter IP (GitHub Codespaces, CI runners, most cloud VMs). Run the app from a residential connection, or set YT_DLP_COOKIES to cookies exported from a browser where you are signed in.",
   },
   {
     pattern: /ffmpeg|postprocessing|conversion failed/i,
@@ -118,7 +123,9 @@ export function fromYtDlpStderr(stderr: string, exitCode: number | null): AppErr
     "UNKNOWN",
     "yt-dlp couldn't process that video.",
     502,
-    exitCode === null ? undefined : `yt-dlp exited with code ${exitCode}.`,
+    // The full stderr is logged server-side but deliberately not returned, so
+    // say where to find it rather than leaving the operator guessing.
+    `yt-dlp exited with code ${exitCode ?? "null"}. The full error was written to the server log.`,
   );
 }
 

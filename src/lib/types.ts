@@ -111,6 +111,7 @@ export type ApiErrorCode =
   | "AGE_RESTRICTED"
   | "GEO_BLOCKED"
   | "MEMBERS_ONLY"
+  | "BLOCKED_BY_YOUTUBE"
   | "LIVE_STREAM"
   | "DRM_PROTECTED"
   | "NO_MATCHING_FORMAT"

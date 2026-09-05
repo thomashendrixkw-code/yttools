@@ -53,20 +53,34 @@ describe("fromYtDlpStderr", () => {
     expect(error.message.length).toBeGreaterThan(0);
   });
 
-  it("treats YouTube's bot check as a rate limit, not an auth failure", () => {
-    const error = fromYtDlpStderr(
+  /**
+   * YouTube refuses datacenter traffic under several different wordings
+   * depending on which stage of extraction failed. All of them mean the same
+   * thing to the user, so all of them must land on the same code — otherwise
+   * running in Codespaces or CI produces a bare 502 with no explanation.
+   */
+  describe("blocked by YouTube", () => {
+    it.each([
       "ERROR: [youtube] abc123: Sign in to confirm you're not a bot. Use --cookies-from-browser",
-      1,
-    );
-    expect(error.status).toBe(429);
-    expect(error.hint).toContain("cookies");
-  });
+      "ERROR: [youtube] abc123: Failed to extract any player response",
+      "ERROR: [youtube] abc123: All player responses are invalid. Your IP is likely being blocked",
+      "ERROR: [youtube] abc123: The following content is not available on this app",
+      "ERROR: [youtube] abc123: Requested content is not available, rate-limit reached",
+      "ERROR: unable to download video data: HTTP Error 403: Forbidden",
+    ])("classifies %s", (stderr) => {
+      const error = fromYtDlpStderr(stderr, 1);
+      expect(error.code).toBe("BLOCKED_BY_YOUTUBE");
+      expect(error.status).toBe(429);
+      expect(error.hint).toMatch(/datacenter|cookies/i);
+    });
 
-  it("does not confuse the bot check with the age gate", () => {
-    const bot = fromYtDlpStderr("Sign in to confirm you're not a bot", 1);
-    const age = fromYtDlpStderr("Sign in to confirm your age", 1);
-    expect(bot.code).not.toBe("AGE_RESTRICTED");
-    expect(age.code).toBe("AGE_RESTRICTED");
+    it("is not confused with the age gate", () => {
+      expect(fromYtDlpStderr("Sign in to confirm your age", 1).code).toBe("AGE_RESTRICTED");
+    });
+
+    it("does not swallow a genuinely removed video", () => {
+      expect(fromYtDlpStderr("ERROR: [youtube] abc: Video unavailable", 1).code).toBe("NOT_FOUND");
+    });
   });
 
   it("falls back to a generic 502 for unrecognised output", () => {
@@ -74,6 +88,7 @@ describe("fromYtDlpStderr", () => {
     expect(error.code).toBe("UNKNOWN");
     expect(error.status).toBe(502);
     expect(error.hint).toContain("2");
+    expect(error.hint).toContain("server log");
   });
 
   it("never leaks raw stderr in the user-facing message", () => {
