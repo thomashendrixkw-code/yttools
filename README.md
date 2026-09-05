@@ -41,6 +41,7 @@ pick. Nothing is ever stored on the server.
 - [Configuration](#configuration)
 - [How it works](#how-it-works)
 - [API reference](#api-reference)
+- [Performance](#performance)
 - [Deployment](#deployment)
 - [Known limitations](#known-limitations)
 - [Troubleshooting](#troubleshooting)
@@ -242,9 +243,23 @@ clicked on.
 }
 ```
 
+`preferSmaller` trades codec compatibility for roughly half the bytes — see
+[Performance](#performance).
+
 Responds with the media stream, `Content-Type`, `Content-Disposition` (RFC 5987 encoded so
-non-ASCII titles survive), and — for single files — `Content-Length`, which is what lets the
-browser show a real transfer bar.
+non-ASCII titles survive), and — for single files — `Content-Length`.
+
+### `GET /api/download`
+
+The same work, reachable by navigation:
+
+```
+/api/download?url=…&type=video&quality=1080&jobId=…&smaller=1
+```
+
+This is what the web UI uses for single files, so the browser streams the response straight
+to disk with its own progress and resume support rather than JavaScript assembling the whole
+file in memory. Batches stay on the POST form.
 
 ### `GET /api/progress?jobId=…`
 
@@ -290,6 +305,44 @@ Every failure returns the same envelope with a matching HTTP status:
 | `TIMEOUT`                                         | 504     | Exceeded `DOWNLOAD_TIMEOUT_MS`       |
 | `CONVERSION_FAILED`, `UNKNOWN`                    | 500/502 | Something else went wrong            |
 
+## Performance
+
+Measured on a 10-minute 1080p60 video, timed from clicking Download to the file landing on
+disk, driven through a real browser:
+
+| Option                     | Bytes  | Time  |
+| -------------------------- | ------ | ----- |
+| Default (H.264)            | 256 MB | ~31 s |
+| **Smaller file** (AV1/VP9) | 122 MB | ~19 s |
+
+YouTube publishes an AV1 or VP9 rendition alongside H.264 at the same resolution, and it is
+routinely **half the size**. The "Smaller file" checkbox selects it. H.264 remains the
+default because it plays on anything; AV1 needs a reasonably recent device.
+
+### What did not work
+
+Recorded so nobody repeats them:
+
+- **`--concurrent-fragments`** — inert. YouTube serves these formats as one ranged file, so
+  yt-dlp never fragments them and the flag has nothing to parallelise (27.3s vs 28.2s).
+- **aria2c with 16 connections** — measurably _slower_ than yt-dlp's native downloader
+  (9.8 vs 13.7 MiB/s over interleaved runs). Not worth the dependency.
+- **Tuning `--http-chunk-size`** from 1M to 10M — no effect beyond noise.
+- **Piping yt-dlp straight to the HTTP response** — merging to stdout abandons MP4 for
+  MPEG-TS and _re-encodes_ at 0.37x realtime, then fails. Far worse than a temp file.
+
+Beware that raw throughput measurements against YouTube drift a lot: the same command
+measured 9.0, 3.3 and 13.7 MiB/s within one hour as YouTube adjusted throttling. Compare
+options interleaved in a single run, never across sessions.
+
+### What did work
+
+- **Caching the metadata extraction.** `/api/info` already extracted the video; passing that
+  document back via `--load-info-json` lets the download skip doing it again — 4.61s to
+  0.97s on an identical download, and unlike anything network-related, deterministic.
+- **Letting the browser own the transfer** instead of buffering the response into a `Blob`.
+- **The smaller-codec option**, above.
+
 ## Deployment
 
 Standard Vercel serverless and edge functions **cannot** run this: they have no `yt-dlp` or
@@ -322,9 +375,10 @@ Three things to plan for:
 
 ## Known limitations
 
-- **The browser buffers the whole file in memory.** The client reads the response into a
-  `Blob` before saving it, so a 4K download of a long video can take a gigabyte of RAM on
-  the client. Fine on a laptop, less fine on an old phone.
+- **Playlist ZIPs are still buffered in the browser.** Single files stream straight to disk,
+  but a batch is fetched into a `Blob` first, because a list of URLs does not fit sensibly
+  in a query string. Batches are usually MP3s and far smaller, but a large one will use
+  memory proportional to the archive.
 - **Progress and rate limiting are per-process**, so they do not survive a restart or span
   replicas.
 - **Playlist batches are sequential**, capped at `MAX_PLAYLIST_ITEMS`, and the whole batch

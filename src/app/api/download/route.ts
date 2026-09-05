@@ -27,11 +27,37 @@ const STREAM_IDLE_LIMIT_MS = 30 * 60_000;
  * disconnect alike. Nothing is ever persisted on the server.
  */
 export async function POST(request: Request) {
+  const body: unknown = await request.json().catch(() => null);
+  return runDownload(request, body);
+}
+
+/**
+ * `GET /api/download?url=…&type=…&quality=…&jobId=…&smaller=1`
+ *
+ * Same work as the POST form, reachable by navigation. The browser can then
+ * stream the response straight to disk with its own progress UI, instead of
+ * JavaScript accumulating the whole file in memory before saving it — which
+ * for a 1080p video means holding a quarter of a gigabyte twice over.
+ *
+ * Errors still return the JSON envelope; the client watches `/api/progress`
+ * for them, since a failed navigation cannot surface one on its own.
+ */
+export async function GET(request: Request) {
+  const params = new URL(request.url).searchParams;
+  return runDownload(request, {
+    url: params.get("url") ?? undefined,
+    type: params.get("type") ?? undefined,
+    quality: Number(params.get("quality")),
+    jobId: params.get("jobId") ?? undefined,
+    preferSmaller: params.get("smaller") === "1",
+  });
+}
+
+async function runDownload(request: Request, body: unknown) {
   let tempDir: string | null = null;
   let jobId: string | null = null;
 
   try {
-    const body: unknown = await request.json().catch(() => null);
     const req = parseDownloadRequest(body);
     jobId = req.jobId;
 
@@ -80,6 +106,7 @@ async function handleSingle(
     type: req.type,
     quality: req.quality,
     destDir: tempDir,
+    preferSmaller: req.preferSmaller,
     signal,
     onProgress: (event) => publishProgress(jobId, event),
   });
@@ -129,6 +156,7 @@ async function handleBatch(
         type: req.type,
         quality: req.quality,
         destDir: itemDir,
+        preferSmaller: req.preferSmaller,
         signal,
         onProgress: (event) =>
           publishProgress(jobId, {

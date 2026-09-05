@@ -89,6 +89,12 @@ export interface DownloadRequest {
   batchUrls?: string[];
   /** Optional label used to name the ZIP when `batchUrls` is present. */
   batchName?: string;
+  /**
+   * Prefer the smallest track at the chosen resolution over the most
+   * compatible one. Typically VP9 instead of H.264 — roughly a third fewer
+   * bytes, at the cost of playback on older devices.
+   */
+  preferSmaller?: boolean;
 }
 
 /** Every error the API returns uses this shape. */

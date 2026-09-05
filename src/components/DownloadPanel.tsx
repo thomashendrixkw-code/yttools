@@ -15,6 +15,8 @@ interface DownloadPanelProps {
   onVideoHeightChange: (height: number) => void;
   audioBitrate: number;
   onAudioBitrateChange: (bitrate: number) => void;
+  preferSmaller: boolean;
+  onPreferSmallerChange: (value: boolean) => void;
   onDownload: () => void;
   onCancel: () => void;
   state: DownloadState;
@@ -34,6 +36,8 @@ export function DownloadPanel({
   onVideoHeightChange,
   audioBitrate,
   onAudioBitrateChange,
+  preferSmaller,
+  onPreferSmallerChange,
   onDownload,
   onCancel,
   state,
@@ -135,6 +139,26 @@ export function DownloadPanel({
         </button>
       </div>
 
+      {mode === "video" && !noVideoFormats ? (
+        <label className="flex cursor-pointer items-start gap-2.5 rounded-lg px-1 py-0.5">
+          <input
+            type="checkbox"
+            checked={preferSmaller}
+            disabled={busy}
+            onChange={(event) => onPreferSmallerChange(event.target.checked)}
+            className="mt-0.5 size-4 shrink-0 cursor-pointer rounded border-zinc-300 text-rose-600 focus:ring-rose-500 disabled:cursor-not-allowed dark:border-zinc-700 dark:bg-zinc-800"
+          />
+          <span className="text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
+            <span className="font-medium text-zinc-800 dark:text-zinc-200">
+              Smaller file, much faster
+            </span>{" "}
+            — picks AV1 or VP9 over H.264. Around half the bytes at the same resolution, so it
+            downloads in roughly a third of the time, but needs a reasonably recent device or
+            player.
+          </span>
+        </label>
+      ) : null}
+
       {noVideoFormats ? (
         <p className="text-sm text-amber-600 dark:text-amber-500">
           This item has no downloadable video formats. Try the Audio tab instead.
@@ -203,19 +227,16 @@ function ModeTabs({
 }
 
 /**
- * A download has two measurable phases — the server pulling and converting the
- * media, then that file transferring to the browser. They are shown as one bar
- * with an explicit step label, because a single merged percentage would be
- * guesswork.
+ * Reports the server-side phase only. The transfer to disk is handled by the
+ * browser's own download UI, so inventing a second bar here would duplicate it
+ * and, worse, guess at numbers this page can no longer observe.
  */
 function ProgressReadout({ state }: { state: DownloadState }) {
-  const transferring = state.transfer !== null;
-  const percent = transferring ? state.transfer : (state.server?.percent ?? null);
   const stage = state.server?.stage ?? "queued";
+  const percent = state.server?.percent ?? null;
 
-  const label = transferring
-    ? "Saving to your device"
-    : stage === "downloading"
+  const label =
+    stage === "downloading"
       ? "Downloading from YouTube"
       : stage === "merging"
         ? "Merging video and audio"
@@ -224,7 +245,7 @@ function ProgressReadout({ state }: { state: DownloadState }) {
           : stage === "packaging"
             ? "Building ZIP archive"
             : stage === "done"
-              ? "Finishing up"
+              ? "Handing off to your browser"
               : "Preparing";
 
   const meta = [
@@ -238,12 +259,7 @@ function ProgressReadout({ state }: { state: DownloadState }) {
   return (
     <div className="inset-panel animate-reveal rounded-xl p-4">
       <div className="mb-2.5 flex items-baseline justify-between gap-3">
-        <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
-          {label}
-          <span className="ml-2 text-xs font-normal text-zinc-500">
-            Step {transferring ? 2 : 1} of 2
-          </span>
-        </p>
+        <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">{label}</p>
         {percent !== null ? (
           <p className="text-sm font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
             {percent}%
@@ -269,7 +285,7 @@ function ProgressReadout({ state }: { state: DownloadState }) {
         )}
       </div>
 
-      {meta && !transferring ? (
+      {meta ? (
         <p className="mt-2.5 text-xs tabular-nums text-zinc-500 dark:text-zinc-500">{meta}</p>
       ) : null}
     </div>

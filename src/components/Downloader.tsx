@@ -42,6 +42,7 @@ export function Downloader() {
   const [mode, setMode] = useState<DownloadMode>("video");
   const [videoHeight, setVideoHeight] = useState<number | null>(null);
   const [audioBitrate, setAudioBitrate] = useState(192);
+  const [preferSmaller, setPreferSmaller] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const infoAbort = useRef<AbortController | null>(null);
@@ -128,6 +129,7 @@ export function Downloader() {
           url: info.playlist.entries[0]?.webpageUrl ?? url,
           type: mode,
           quality,
+          preferSmaller,
           batchUrls: chosen.map((entry) => entry.webpageUrl),
           batchName: info.playlist.title,
           fallbackName: `${info.playlist.title}.zip`,
@@ -150,6 +152,7 @@ export function Downloader() {
         url: video.webpageUrl,
         type: mode,
         quality,
+        preferSmaller,
         fallbackName: `${video.title}.${extension}`,
       });
 
@@ -170,7 +173,18 @@ export function Downloader() {
       const apiError = err instanceof ApiClientError ? err : null;
       toast.push("error", apiError?.message ?? "The download failed.", apiError?.hint);
     }
-  }, [audioBitrate, download, history, info, mode, selectedIds, toast, url, videoHeight]);
+  }, [
+    audioBitrate,
+    download,
+    history,
+    info,
+    mode,
+    preferSmaller,
+    selectedIds,
+    toast,
+    url,
+    videoHeight,
+  ]);
 
   const handleReuse = useCallback(
     (entry: HistoryEntry) => {
@@ -252,6 +266,8 @@ export function Downloader() {
               onVideoHeightChange={setVideoHeight}
               audioBitrate={audioBitrate}
               onAudioBitrateChange={setAudioBitrate}
+              preferSmaller={preferSmaller}
+              onPreferSmallerChange={setPreferSmaller}
               onDownload={() => void handleDownload()}
               onCancel={download.cancel}
               state={download.state}

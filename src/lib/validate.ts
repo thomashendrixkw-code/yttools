@@ -106,6 +106,8 @@ export interface ValidatedDownload {
   batchUrls: string[] | null;
   /** Sanitised ZIP base name for batch downloads. */
   batchName: string | null;
+  /** Trade codec compatibility for fewer bytes. */
+  preferSmaller: boolean;
 }
 
 /** Validate the `POST /api/download` body end to end. */
@@ -114,7 +116,8 @@ export function parseDownloadRequest(body: unknown): ValidatedDownload {
     throw new AppError("INVALID_REQUEST", "Malformed request body.");
   }
 
-  const { url, type, quality, jobId, batchUrls, batchName } = body as Partial<DownloadRequest>;
+  const { url, type, quality, jobId, batchUrls, batchName, preferSmaller } =
+    body as Partial<DownloadRequest>;
 
   if (type !== "video" && type !== "audio") {
     throw new AppError("INVALID_REQUEST", '`type` must be either "video" or "audio".');
@@ -156,6 +159,7 @@ export function parseDownloadRequest(body: unknown): ValidatedDownload {
     jobId: typeof jobId === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(jobId) ? jobId : null,
     batchUrls: validatedBatch,
     batchName: sanitiseBatchName(batchName),
+    preferSmaller: preferSmaller === true,
   };
 }
 

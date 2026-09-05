@@ -1,8 +1,10 @@
 import { spawn } from "node:child_process";
+import { mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 
 import { requireBinary, resolveBinary } from "./binaries";
 import { AppError, fromYtDlpStderr } from "./errors";
+import { dropInfo, lookupInfo, storeInfo } from "./info-cache";
 import { findOutputFile } from "./temp";
 import type { MediaInfo, PlaylistEntry, ProgressEvent, VideoQualityOption } from "./types";
 
@@ -171,14 +173,22 @@ interface RawInfo {
   playlist_count?: number | null;
 }
 
-/** Run `yt-dlp -J` and parse the resulting JSON document. */
-async function dumpJson(args: string[], signal?: AbortSignal): Promise<RawInfo> {
+/**
+ * Run `yt-dlp -J` and parse the resulting JSON document. The raw text comes
+ * back alongside the parsed form so it can be handed to the info cache
+ * verbatim — re-serialising our narrowed `RawInfo` would drop the fields
+ * yt-dlp needs to resume without re-extracting.
+ */
+async function dumpJson(
+  args: string[],
+  signal?: AbortSignal,
+): Promise<{ info: RawInfo; raw: string }> {
   const result = await runYtDlp({ args, timeoutMs: INFO_TIMEOUT_MS, signal });
 
   if (result.code !== 0) throw failFromStderr(result.stderr, result.code);
 
   try {
-    return JSON.parse(result.stdout) as RawInfo;
+    return { info: JSON.parse(result.stdout) as RawInfo, raw: result.stdout };
   } catch {
     throw new AppError("UNKNOWN", "yt-dlp returned a response we couldn't read.", 502);
   }
@@ -266,7 +276,7 @@ function toMediaInfo(info: RawInfo, fallbackUrl: string): MediaInfo {
 
 /** Fetch full metadata (including formats) for a single video. */
 export async function fetchVideoInfo(url: string, signal?: AbortSignal): Promise<MediaInfo> {
-  const info = await dumpJson([...baseArgs(), "-J", "--no-playlist", url], signal);
+  const { info, raw } = await dumpJson([...baseArgs(), "-J", "--no-playlist", url], signal);
 
   if (info._type === "playlist") {
     throw new AppError("INVALID_URL", "That link resolved to a playlist, not a single video.");
@@ -284,6 +294,9 @@ export async function fetchVideoInfo(url: string, signal?: AbortSignal): Promise
   if (media.qualities.length === 0) {
     throw new AppError("NO_MATCHING_FORMAT", "No downloadable video formats were found.", 422);
   }
+
+  // The download that almost certainly follows can now skip extraction.
+  await storeInfo(url, raw);
 
   return media;
 }
@@ -307,7 +320,7 @@ export async function fetchPlaylistInfo(
   maxItems: number,
   signal?: AbortSignal,
 ): Promise<PlaylistInfo> {
-  const info = await dumpJson(
+  const { info } = await dumpJson(
     [
       ...baseArgs(),
       "-J",
@@ -355,12 +368,20 @@ export async function fetchPlaylistInfo(
  * into MP4 without re-encoding), then any separate tracks at that height, then
  * a progressive single-file format, then whatever exists.
  */
-function videoFormatSelector(height: number, canMerge: boolean): string {
+function videoFormatSelector(height: number, canMerge: boolean, preferSmaller: boolean): string {
   // Without ffmpeg, yt-dlp cannot combine separate tracks — it would leave two
   // files behind and we would ship a silent video. Restrict to progressive
   // (single-file, audio included) formats instead, which top out at 720p.
   if (!canMerge) {
     return [`b[height<=${height}][ext=mp4]`, `b[height<=${height}]`, "b"].join("/");
+  }
+
+  // Smallest-first: let --format-sort pick the leanest track at this height,
+  // whatever the codec. YouTube's VP9 rendition is routinely a third smaller
+  // than its H.264 one at the same resolution, which is the only lever that
+  // actually reduces bytes on the wire.
+  if (preferSmaller) {
+    return [`bv*[height<=${height}]+ba`, `b[height<=${height}]`, "b"].join("/");
   }
 
   return [
@@ -382,6 +403,8 @@ export interface DownloadOptions {
   /** Height in px for video, bitrate in kbps for audio. */
   quality: number;
   destDir: string;
+  /** Trade codec compatibility for fewer bytes. See videoFormatSelector. */
+  preferSmaller?: boolean;
   onProgress?: (event: ProgressEvent) => void;
   signal?: AbortSignal;
 }
@@ -404,6 +427,7 @@ export async function downloadMedia({
   type,
   quality,
   destDir,
+  preferSmaller = false,
   onProgress,
   signal,
 }: DownloadOptions): Promise<DownloadedFile> {
@@ -415,50 +439,67 @@ export async function downloadMedia({
 
   const outputTemplate = path.join(destDir, "%(title).120B [%(id)s].%(ext)s");
 
-  const args = [
-    ...baseArgs(),
-    "--no-playlist",
-    "--newline",
-    "--progress",
-    "--progress-template",
-    `download:${DL_MARKER}%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s`,
-    "--progress-template",
-    `postprocess:${PP_MARKER}%(progress.postprocessor)s|%(progress.status)s`,
-    "-o",
-    outputTemplate,
-  ];
+  /**
+   * `infoJson` is a path to a cached `yt-dlp -J` document. Supplying it skips
+   * re-extracting a video `/api/info` already described, which is worth ~3.6s
+   * on every download.
+   */
+  function buildArgs(infoJson: string | null): string[] {
+    const args = [
+      ...baseArgs(),
+      "--no-playlist",
+      "--newline",
+      "--progress",
+      "--progress-template",
+      `download:${DL_MARKER}%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s`,
+      "--progress-template",
+      `postprocess:${PP_MARKER}%(progress.postprocessor)s|%(progress.status)s`,
+      "-o",
+      outputTemplate,
+    ];
 
-  if (ffmpeg) args.push("--ffmpeg-location", ffmpeg.path);
+    if (ffmpeg) args.push("--ffmpeg-location", ffmpeg.path);
 
-  if (type === "video") {
-    args.push("-f", videoFormatSelector(quality, ffmpeg !== null), "--merge-output-format", "mp4");
-  } else {
-    args.push(
-      "-f",
-      "ba/b",
-      "-x",
-      "--audio-format",
-      "mp3",
-      "--audio-quality",
-      `${quality}K`,
-      // Copies title/artist/date into ID3 tags. Handled by ffmpeg, no extra deps.
-      "--embed-metadata",
-    );
+    if (type === "video") {
+      args.push("-f", videoFormatSelector(quality, ffmpeg !== null, preferSmaller));
+      if (preferSmaller) {
+        // Highest resolution within the cap, then the smallest file at it.
+        args.push("-S", "res,+size,+br");
+        // Smallest-first can land on VP9/Opus, which MP4 cannot always hold.
+        args.push("--merge-output-format", "mp4/webm/mkv");
+      } else {
+        args.push("--merge-output-format", "mp4");
+      }
+    } else {
+      args.push(
+        "-f",
+        "ba/b",
+        "-x",
+        "--audio-format",
+        "mp3",
+        "--audio-quality",
+        `${quality}K`,
+        // Copies title/artist/date into ID3 tags. Handled by ffmpeg, no extra deps.
+        "--embed-metadata",
+      );
+    }
+
+    // With a cached document yt-dlp works from it instead of a URL.
+    if (infoJson) args.push("--load-info-json", infoJson);
+    else args.push(url);
+
+    return args;
   }
 
-  args.push(url);
+  /**
+   * yt-dlp reports each stream's progress from 0-100 independently. A fresh
+   * tracker per attempt keeps a retry from inheriting the previous phase.
+   */
+  function makeLineHandler(): (line: string) => void {
+    let phase = 0;
+    let lastPercent = -1;
 
-  // yt-dlp reports each stream's progress from 0-100 independently. Track the
-  // phase so a merged download reads as two labelled steps rather than a bar
-  // that mysteriously restarts.
-  let phase = 0;
-  let lastPercent = -1;
-
-  const result = await runYtDlp({
-    args,
-    timeoutMs: DOWNLOAD_TIMEOUT_MS,
-    signal,
-    onStdoutLine: (line) => {
+    return (line: string) => {
       if (!onProgress) return;
 
       if (line.startsWith(DL_MARKER)) {
@@ -493,8 +534,30 @@ export async function downloadMedia({
           detail: name === "NA" || name === "" ? undefined : name,
         });
       }
-    },
-  });
+    };
+  }
+
+  const attempt = (infoJson: string | null) =>
+    runYtDlp({
+      args: buildArgs(infoJson),
+      timeoutMs: DOWNLOAD_TIMEOUT_MS,
+      signal,
+      onStdoutLine: makeLineHandler(),
+    });
+
+  const cachedInfo = lookupInfo(url);
+  let result = await attempt(cachedInfo);
+
+  if (result.code !== 0 && cachedInfo && !signal?.aborted) {
+    // The cached document embeds URLs that expire. A failure while using it is
+    // more likely staleness than a real problem with the video, so drop the
+    // entry and give it one honest attempt with a fresh extraction.
+    console.warn("[yt-dlp] cached info failed; retrying with a fresh extraction");
+    await dropInfo(url);
+    await rm(destDir, { recursive: true, force: true });
+    await mkdir(destDir, { recursive: true });
+    result = await attempt(null);
+  }
 
   if (result.code !== 0) throw failFromStderr(result.stderr, result.code);
 

@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- "Smaller file" option, selecting YouTube's AV1/VP9 rendition instead of H.264
+  at the same resolution: roughly half the bytes, so a 1080p download finishes in
+  about a third less time. Off by default, since H.264 plays on anything.
+- `GET /api/download`, so the browser can stream a download straight to disk.
+- Metadata extraction is cached between `/api/info` and `/api/download`
+  (`--load-info-json`), removing a duplicated 2-4s extraction per download.
+
+### Changed
+
+- Single downloads no longer pass through a `Blob` in the page. A 1080p file was
+  held in memory twice over — roughly half a gigabyte — before being saved.
+  Playlist ZIPs still use the previous path.
+- The progress panel reports the server phase only; the browser's own download
+  UI owns the transfer.
+
+### Added
+
 - `BLOCKED_BY_YOUTUBE` error code (HTTP 429) covering the several wordings yt-dlp
   produces when YouTube refuses a request — common from datacenter IPs such as
   GitHub Codespaces and CI runners. These previously fell through to a bare 502.

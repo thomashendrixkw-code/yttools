@@ -97,6 +97,23 @@ describe("parseDownloadRequest", () => {
       jobId: null,
       batchUrls: null,
       batchName: null,
+      preferSmaller: false,
+    });
+  });
+
+  describe("preferSmaller", () => {
+    it("defaults to false", () => {
+      expect(parseDownloadRequest(base).preferSmaller).toBe(false);
+    });
+
+    it("is enabled only by a literal true", () => {
+      expect(parseDownloadRequest({ ...base, preferSmaller: true }).preferSmaller).toBe(true);
+    });
+
+    it.each(["true", 1, "1", {}, null])("ignores the truthy-ish value %s", (value) => {
+      // Query strings and hand-rolled clients send all sorts of things; only an
+      // actual boolean should switch the codec away from H.264.
+      expect(parseDownloadRequest({ ...base, preferSmaller: value }).preferSmaller).toBe(false);
     });
   });
 

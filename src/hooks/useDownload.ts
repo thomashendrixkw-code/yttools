@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ApiClientError, filenameFromDisposition, saveBlob, startDownload } from "@/lib/api-client";
 import type { ProgressEvent } from "@/lib/types";
@@ -10,11 +10,12 @@ export interface DownloadState {
   active: boolean;
   /** Server-side phase, streamed over SSE. */
   server: ProgressEvent | null;
-  /** 0-100 for the browser-side transfer, or null while it hasn't started. */
-  transfer: number | null;
 }
 
-const IDLE: DownloadState = { active: false, server: null, transfer: null };
+const IDLE: DownloadState = { active: false, server: null };
+
+/** Abandon a job that never reported completion, so the UI cannot wedge. */
+const WATCHDOG_MS = 30 * 60_000;
 
 /**
  * `crypto.randomUUID` only exists in a secure context, so a plain-HTTP LAN
@@ -31,6 +32,8 @@ export interface RunDownloadArgs {
   url: string;
   type: "video" | "audio";
   quality: number;
+  /** Trade codec compatibility for roughly half the bytes. */
+  preferSmaller?: boolean;
   batchUrls?: string[];
   batchName?: string;
   /** Used as the filename if the server sends no `Content-Disposition`. */
@@ -40,94 +43,180 @@ export interface RunDownloadArgs {
 /**
  * Drives one download from click to saved file.
  *
- * There are two progress phases and they measure different things:
- *   1. the server fetching and converting the media (reported over SSE), and
- *   2. that finished file transferring to the browser (measured locally).
- * Showing them as one bar would be a lie, so the UI labels them separately.
+ * Single files are fetched by pointing a hidden iframe at `GET /api/download`,
+ * which lets the browser stream the response straight to disk with its own
+ * progress and resume support. The previous approach — reading the response in
+ * JavaScript and assembling a Blob — held the entire file in memory twice over,
+ * which for a 1080p video is roughly half a gigabyte and a visible stall.
+ *
+ * Playlist ZIPs still go through fetch, because a batch does not fit sensibly
+ * in a query string. They are typically MP3s and far smaller.
+ *
+ * Progress and failures both arrive over `/api/progress`: a navigation cannot
+ * report an error back to the page on its own.
  */
 export function useDownload() {
   const [state, setState] = useState<DownloadState>(IDLE);
+  const frameRef = useRef<HTMLIFrameElement | null>(null);
+  const eventsRef = useRef<EventSource | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  /** Abort an in-flight download; the server kills yt-dlp when the socket drops. */
+  /**
+   * `abortTransfer` must stay false on normal completion. The server reports
+   * "done" as soon as the file is ready to stream, which is *before* the
+   * browser has finished writing it — blanking the frame there aborts the
+   * download the user is waiting for.
+   */
+  const teardown = useCallback((abortTransfer: boolean) => {
+    eventsRef.current?.close();
+    eventsRef.current = null;
+    abortRef.current = null;
+    if (abortTransfer && frameRef.current) frameRef.current.src = "about:blank";
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      eventsRef.current?.close();
+      abortRef.current?.abort();
+      frameRef.current?.remove();
+      frameRef.current = null;
+    };
+  }, []);
+
   const cancel = useCallback(() => {
     abortRef.current?.abort();
-    abortRef.current = null;
+    teardown(true);
     setState(IDLE);
+  }, [teardown]);
+
+  /** The hidden frame that receives `Content-Disposition: attachment`. */
+  const ensureFrame = useCallback((): HTMLIFrameElement => {
+    if (frameRef.current?.isConnected) return frameRef.current;
+    const frame = document.createElement("iframe");
+    frame.setAttribute("aria-hidden", "true");
+    frame.title = "File download";
+    frame.style.display = "none";
+    document.body.appendChild(frame);
+    frameRef.current = frame;
+    return frame;
   }, []);
 
-  const run = useCallback(async (args: RunDownloadArgs): Promise<string> => {
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setState({ active: true, server: { stage: "queued", percent: null }, transfer: null });
+  const run = useCallback(
+    async (args: RunDownloadArgs): Promise<string> => {
+      const jobId = randomJobId();
+      setState({ active: true, server: { stage: "queued", percent: null } });
 
-    // Correlates this request with its SSE progress channel.
-    const jobId = randomJobId();
-    const events = new EventSource(`/api/progress?jobId=${jobId}`);
+      const events = new EventSource(`/api/progress?jobId=${jobId}`);
+      eventsRef.current = events;
 
-    events.onmessage = (message) => {
       try {
-        const event = JSON.parse(message.data as string) as ProgressEvent;
-        setState((current) => (current.active ? { ...current, server: event } : current));
-      } catch {
-        // A malformed frame is not worth failing the download over.
+        if (args.batchUrls) return await runBatch(args, jobId, events, setState, abortRef);
+        return await runSingle(args, jobId, events, setState, ensureFrame());
+      } finally {
+        // Leave the frame alone: the browser is still writing the file.
+        teardown(false);
+        setState(IDLE);
       }
-    };
-    // Progress is cosmetic: if the channel dies, the download carries on.
-    events.onerror = () => events.close();
-
-    try {
-      const response = await startDownload(
-        {
-          url: args.url,
-          type: args.type,
-          quality: args.quality,
-          jobId,
-          ...(args.batchUrls ? { batchUrls: args.batchUrls } : {}),
-          ...(args.batchName ? { batchName: args.batchName } : {}),
-        },
-        controller.signal,
-      );
-
-      const filename = filenameFromDisposition(
-        response.headers.get("Content-Disposition"),
-        args.fallbackName,
-      );
-      const contentType = response.headers.get("Content-Type") ?? "application/octet-stream";
-      const declared = Number(response.headers.get("Content-Length") ?? 0);
-      const total = Number.isFinite(declared) && declared > 0 ? declared : null;
-
-      if (!response.body) throw new ApiClientError("UNKNOWN", "The server sent an empty response.");
-
-      // Read the stream by hand so the transfer has a real progress bar. ZIP
-      // responses have no Content-Length, so those stay indeterminate.
-      const reader = response.body.getReader();
-      const chunks: Uint8Array[] = [];
-      let received = 0;
-
-      setState((current) => ({ ...current, transfer: 0 }));
-
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (!value) continue;
-
-        chunks.push(value);
-        received += value.byteLength;
-        if (total) {
-          const pct = Math.min(100, Math.round((received / total) * 100));
-          setState((current) => (current.active ? { ...current, transfer: pct } : current));
-        }
-      }
-
-      saveBlob(new Blob(chunks as BlobPart[], { type: contentType }), filename);
-      return filename;
-    } finally {
-      events.close();
-      abortRef.current = null;
-      setState(IDLE);
-    }
-  }, []);
+    },
+    [ensureFrame, teardown],
+  );
 
   return { state, run, cancel };
+}
+
+/* ------------------------------------------------------------------ */
+
+type SetState = (updater: (current: DownloadState) => DownloadState) => void;
+
+/** Single file: the browser does the transfer, SSE reports the server phase. */
+function runSingle(
+  args: RunDownloadArgs,
+  jobId: string,
+  events: EventSource,
+  setState: React.Dispatch<React.SetStateAction<DownloadState>>,
+  frame: HTMLIFrameElement,
+): Promise<string> {
+  const query = new URLSearchParams({
+    url: args.url,
+    type: args.type,
+    quality: String(args.quality),
+    jobId,
+  });
+  if (args.preferSmaller) query.set("smaller", "1");
+
+  return new Promise<string>((resolve, reject) => {
+    const watchdog = window.setTimeout(() => {
+      reject(new ApiClientError("TIMEOUT", "The download did not finish in time."));
+    }, WATCHDOG_MS);
+
+    const settle = (fn: () => void) => {
+      window.clearTimeout(watchdog);
+      fn();
+    };
+
+    events.onmessage = (message) => {
+      let event: ProgressEvent;
+      try {
+        event = JSON.parse(message.data as string) as ProgressEvent;
+      } catch {
+        return;
+      }
+
+      setState((current) => (current.active ? { ...current, server: event } : current));
+
+      if (event.stage === "done") settle(() => resolve(args.fallbackName));
+      if (event.stage === "error") {
+        settle(() => reject(new ApiClientError("UNKNOWN", event.detail ?? "The download failed.")));
+      }
+    };
+
+    // Progress is a convenience. Without it we cannot observe completion, so
+    // hand off to the browser and let its own download UI take over.
+    events.onerror = () => settle(() => resolve(args.fallbackName));
+
+    frame.src = `/api/download?${query.toString()}`;
+  });
+}
+
+/** Playlist ZIP: still fetched, since a batch cannot live in a query string. */
+async function runBatch(
+  args: RunDownloadArgs,
+  jobId: string,
+  events: EventSource,
+  setState: React.Dispatch<React.SetStateAction<DownloadState>>,
+  abortRef: React.MutableRefObject<AbortController | null>,
+): Promise<string> {
+  const controller = new AbortController();
+  abortRef.current = controller;
+
+  events.onmessage = (message) => {
+    try {
+      const event = JSON.parse(message.data as string) as ProgressEvent;
+      setState((current) => (current.active ? { ...current, server: event } : current));
+    } catch {
+      // A malformed frame is not worth failing the download over.
+    }
+  };
+  events.onerror = () => events.close();
+
+  const response = await startDownload(
+    {
+      url: args.url,
+      type: args.type,
+      quality: args.quality,
+      jobId,
+      batchUrls: args.batchUrls,
+      ...(args.batchName ? { batchName: args.batchName } : {}),
+      ...(args.preferSmaller ? { preferSmaller: true } : {}),
+    },
+    controller.signal,
+  );
+
+  const filename = filenameFromDisposition(
+    response.headers.get("Content-Disposition"),
+    args.fallbackName,
+  );
+  const blob = await response.blob();
+  saveBlob(blob, filename);
+  return filename;
 }
