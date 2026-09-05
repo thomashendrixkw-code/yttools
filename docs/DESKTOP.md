@@ -27,15 +27,50 @@ properly requires a paid Apple Developer account; see [Signing](#signing-optiona
 
 ## What is inside
 
-| Component           | Size    | Why it is bundled                                         |
-| ------------------- | ------- | --------------------------------------------------------- |
-| Electron 33         | ~250 MB | Window, and it doubles as the Node runtime for the server |
-| CPython 3.12        | ~70 MB  | yt-dlp needs Python 3.10+; macOS only ships 3.9           |
-| ffmpeg 6.0 (static) | ~43 MB  | MP3 encoding and merging video + audio                    |
-| yt-dlp zipapp       | ~3 MB   | The downloader itself                                     |
-| Next.js server      | ~49 MB  | The same server that runs in Docker                       |
+| Component             | Size    | Why it is bundled                                         |
+| --------------------- | ------- | --------------------------------------------------------- |
+| Electron 33 (pruned)  | ~185 MB | Window, and it doubles as the Node runtime for the server |
+| CPython 3.12 (pruned) | ~48 MB  | yt-dlp needs Python 3.10+; macOS only ships 3.9           |
+| ffmpeg 6.0 (static)   | ~44 MB  | MP3 encoding and merging video + audio                    |
+| Next.js server        | ~18 MB  | The same server that runs in Docker                       |
+| yt-dlp zipapp         | ~3 MB   | The downloader itself                                     |
 
-DMG around 156 MB, installed app around 399 MB.
+DMG around 119 MB, installed app around 309 MB.
+
+### How it got there
+
+The first working build was 409 MB / 156 MB. Four cuts, each verified against the
+packaged app rather than assumed:
+
+| Removed                           | Saved | Why it was safe                                                                                                                                                              |
+| --------------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sharp` + `@img` from the server  | 27 MB | Next traces the image optimiser into the standalone build even with `images.unoptimized`, but thumbnails are plain `<img>` tags. Verified the server still boots and serves. |
+| 54 Chromium locale bundles        | 40 MB | The UI is English only and Chromium falls back to `en`.                                                                                                                      |
+| SwiftShader (`libvk_swiftshader`) | 16 MB | Chromium's CPU rasteriser, only used when no GPU exists. Verified: no `gl_`/`viz_`/`gpu_` errors in the packaged app's log.                                                  |
+| CPython stdlib it never uses      | 18 MB | pip, ensurepip, idlelib, lib2to3, pydoc_data, tkinter and Tcl/Tk. Verified yt-dlp still extracts metadata.                                                                   |
+
+`__pycache__` is deliberately **kept**: the bundle is read-only, so removing it would
+make Python recompile the stdlib on every launch to save 4 MB.
+
+`electron-builder`'s own `electronLanguages` option does not do the locale job — its
+`getLocalesConfig` points at `Contents/Resources`, where the `.lproj` directories are
+empty stubs. The real 40 MB sits inside the Electron framework, so
+`scripts/after-pack.cjs` handles it.
+
+### What was tried and rejected
+
+- **Removing ANGLE** (`libGLESv2` + `libEGL`, ~7 MB). The window still paints, so a
+  screenshot looks fine — but the log fills with _"Exiting GPU process due to errors
+  during initialization"_ and Chromium crashloops into software compositing. The
+  screenshot alone would have hidden this.
+- **Replacing Electron with a native shell plus Node.** Electron's framework is 185 MB;
+  the `node` binary alone is **229 MB**. Electron serving as both window and Node runtime
+  is the cheaper arrangement here, not the expensive one.
+
+The largest remaining item is ffmpeg at 44 MB. A build configured with
+`--disable-everything` plus only the demuxers, muxers and the LAME encoder this app
+actually uses would land around 10–15 MB, but it means compiling ffmpeg from source in CI
+and risks a format that silently stops merging. Not attempted.
 
 ### Why not the official `yt-dlp_macos` binary
 

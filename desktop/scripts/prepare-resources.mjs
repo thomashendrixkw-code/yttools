@@ -7,7 +7,16 @@
  * Run from desktop/ via `npm run prepare-resources`.
  */
 import { execFileSync } from "node:child_process";
-import { chmodSync, cpSync, existsSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -34,6 +43,17 @@ const PYTHON_URL =
 
 const step = (msg) => console.log(`\n==> ${msg}`);
 
+/** Recursive byte size, for reporting what the pruning actually saved. */
+function dirSize(dir) {
+  let total = 0;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) total += dirSize(full);
+    else if (entry.isFile()) total += statSync(full).size;
+  }
+  return total;
+}
+
 /* ------------------------------------------------------------------ */
 
 step("Building the Next.js app");
@@ -58,6 +78,22 @@ if (existsSync(path.join(repoRoot, "public"))) {
   cpSync(path.join(repoRoot, "public"), path.join(serverDir, "public"), { recursive: true });
 }
 
+// Next traces sharp and its libvips binaries into the standalone output even
+// with `images.unoptimized`, but this app never calls next/image — thumbnails
+// are plain <img> tags pointing at YouTube's CDN. That is 26 MB of dead
+// weight; the server boots and serves fine without it.
+{
+  const before = dirSize(serverDir);
+  for (const dead of ["@img", "sharp"]) {
+    rmSync(path.join(serverDir, "node_modules", dead), { recursive: true, force: true });
+  }
+  const after = dirSize(serverDir);
+  console.log(
+    `    dropped unused image optimiser: ${(before / 1048576).toFixed(0)} MiB -> ` +
+      `${(after / 1048576).toFixed(0)} MiB`,
+  );
+}
+
 if (!existsSync(path.join(serverDir, "server.js"))) {
   throw new Error("server.js missing from the assembled bundle");
 }
@@ -80,6 +116,50 @@ if (existsSync(path.join(pythonDir, "bin", "python3"))) {
   // The archive unpacks to a top-level "python/" directory.
   execFileSync("tar", ["xzf", tarball, "-C", resources], { stdio: "inherit" });
   rmSync(tarball, { force: true });
+}
+
+step("Pruning the Python runtime");
+{
+  // A CPython install carries a lot that yt-dlp never touches. Everything
+  // below is removed deliberately; __pycache__ is deliberately *kept*, since
+  // the bundle is read-only and Python would otherwise recompile the stdlib
+  // on every launch.
+  const lib = path.join(pythonDir, "lib");
+  const stdlib = path.join(lib, "python3.12");
+  const before = dirSize(pythonDir);
+
+  const doomed = [
+    path.join(stdlib, "site-packages"), // pip; the bundle installs nothing
+    path.join(stdlib, "ensurepip"),
+    path.join(stdlib, "idlelib"),
+    path.join(stdlib, "lib2to3"),
+    path.join(stdlib, "pydoc_data"),
+    path.join(stdlib, "turtledemo"),
+    path.join(stdlib, "tkinter"),
+    path.join(stdlib, "test"),
+    path.join(pythonDir, "include"),
+    path.join(pythonDir, "share"),
+  ];
+  // Launcher scripts for the modules just removed; they would only fail.
+  const pyBin = path.join(pythonDir, "bin");
+  if (existsSync(pyBin)) {
+    for (const entry of readdirSync(pyBin)) {
+      if (/^(2to3|idle3?|pydoc3?|pip3?)/.test(entry)) doomed.push(path.join(pyBin, entry));
+    }
+  }
+
+  // Tcl/Tk exists only for tkinter, which went with the list above.
+  for (const entry of readdirSync(lib)) {
+    if (/^(tcl|tk|libtcl|libtk|itcl|thread)/i.test(entry)) doomed.push(path.join(lib, entry));
+  }
+
+  for (const target of doomed) rmSync(target, { recursive: true, force: true });
+
+  const after = dirSize(pythonDir);
+  console.log(
+    `    ${(before / 1048576).toFixed(0)} MiB -> ${(after / 1048576).toFixed(0)} MiB` +
+      `  (saved ${((before - after) / 1048576).toFixed(0)} MiB)`,
+  );
 }
 
 step("Fetching the yt-dlp zipapp");
@@ -141,3 +221,8 @@ writeFileSync(
 );
 
 step("Resources ready");
+for (const part of ["server", "python", "bin"]) {
+  const dir = path.join(resources, part);
+  if (existsSync(dir))
+    console.log(`    ${part.padEnd(7)} ${(dirSize(dir) / 1048576).toFixed(0).padStart(4)} MiB`);
+}

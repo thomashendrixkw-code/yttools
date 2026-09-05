@@ -15,6 +15,10 @@ extraResources:
   - from: resources
     to: .
 
+# Prunes the Chromium locale bundles and SwiftShader from inside the Electron
+# framework, which electron-builder's own electronLanguages does not reach.
+afterPack: scripts/after-pack.cjs
+
 mac:
   category: public.app-category.utilities
   icon: build/icon.icns
@@ -36,6 +40,8 @@ mac:
 
 dmg:
   title: YT Tools
+  # LZFSE compresses the image noticeably better than the default zlib.
+  format: ULFO
   contents:
     - x: 140
       y: 190

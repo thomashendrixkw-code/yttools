@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Desktop app slimmed from 409 MB to 309 MB (DMG 156 MB to 119 MB): dropped
+  `sharp` and its libvips binaries, which Next traces into the standalone build
+  although the app never uses next/image; 54 unused Chromium locale bundles;
+  SwiftShader; and the parts of CPython yt-dlp never touches. Each verified
+  against the packaged app. See docs/DESKTOP.md for what was rejected.
+
 - Single downloads no longer pass through a `Blob` in the page. A 1080p file was
   held in memory twice over — roughly half a gigabyte — before being saved.
   Playlist ZIPs still use the previous path.
