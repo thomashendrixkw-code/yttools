@@ -50,6 +50,21 @@ const PYTHON_URL =
 
 const step = (msg) => console.log(`\n==> ${msg}`);
 
+/** Fetch a URL to disk, retrying transient failures. */
+async function download(url, dest, attempts = 3) {
+  for (let i = 1; ; i += 1) {
+    try {
+      const res = await fetch(url, { redirect: "follow" });
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      writeFileSync(dest, Buffer.from(await res.arrayBuffer()));
+      return;
+    } catch (err) {
+      if (i >= attempts) throw new Error(`downloading ${url}: ${err.message}`);
+      console.log(`    attempt ${i} failed (${err.message}), retrying`);
+    }
+  }
+}
+
 /** Recursive byte size, for reporting what the pruning actually saved. */
 function dirSize(dir) {
   let total = 0;
@@ -64,7 +79,13 @@ function dirSize(dir) {
 /* ------------------------------------------------------------------ */
 
 step("Building the Next.js app");
-execFileSync("npm", ["run", "build"], { cwd: repoRoot, stdio: "inherit" });
+execFileSync(IS_WINDOWS ? "npm.cmd" : "npm", ["run", "build"], {
+  cwd: repoRoot,
+  stdio: "inherit",
+  // On Windows npm is a .cmd, which Node refuses to spawn directly. The
+  // arguments are static, so a shell introduces nothing here.
+  shell: IS_WINDOWS,
+});
 
 const standalone = path.join(repoRoot, ".next", "standalone");
 if (!existsSync(standalone)) {
@@ -119,7 +140,7 @@ if (existsSync(path.join(pythonDir, ...PYTHON_EXE))) {
   rmSync(pythonDir, { recursive: true, force: true });
   mkdirSync(resources, { recursive: true });
   const tarball = path.join(resources, "python.tar.gz");
-  execFileSync("curl", ["-fsSL", "--retry", "3", "-o", tarball, PYTHON_URL], { stdio: "inherit" });
+  await download(PYTHON_URL, tarball);
   // The archive unpacks to a top-level "python/" directory.
   execFileSync("tar", ["xzf", tarball, "-C", resources], { stdio: "inherit" });
   rmSync(tarball, { force: true });
@@ -175,9 +196,7 @@ const zipapp = path.join(binDir, "yt-dlp.pyz");
 if (existsSync(zipapp)) {
   console.log("    already present, keeping it (delete it to refresh)");
 } else {
-  execFileSync("curl", ["-fsSL", "--retry", "3", "-o", zipapp, YT_DLP_ZIPAPP_URL], {
-    stdio: "inherit",
-  });
+  await download(YT_DLP_ZIPAPP_URL, zipapp);
 }
 
 // No wrapper script: the app is told to run `python <zipapp>` directly, which
