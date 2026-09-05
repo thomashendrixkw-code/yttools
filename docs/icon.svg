@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="YT Tools">
+  <defs>
+    <linearGradient id="m" x1="4" y1="2" x2="28" y2="30" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fb7185" />
+      <stop offset="1" stop-color="#e11d48" />
+    </linearGradient>
+    <linearGradient id="s" x1="16" y1="0" x2="16" y2="16" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff" stop-opacity=".22" />
+      <stop offset="1" stop-color="#fff" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="9" fill="url(#m)" />
+  <rect width="32" height="32" rx="9" fill="url(#s)" />
+  <path d="M10.4 9.4h11.2L16 17.4z" fill="#fff" stroke="#fff" stroke-width="2" stroke-linejoin="round" />
+  <path d="M10.6 22.4h10.8" stroke="#fff" stroke-width="2.6" stroke-linecap="round" />
+</svg>

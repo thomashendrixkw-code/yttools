@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>YT Tools — YouTube downloader for macOS</title>
+    <meta
+      name="description"
+      content="A free, self-contained macOS app that saves YouTube videos as MP4 or extracts the audio as MP3. Nothing to install, nothing sent to a server."
+    />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+
+    <meta property="og:title" content="YT Tools — YouTube downloader for macOS" />
+    <meta
+      property="og:description"
+      content="Save YouTube videos as MP4 or pull the audio as MP3. Self-contained macOS app — yt-dlp and ffmpeg included."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="screenshot-light.png" />
+
+    <style>
+      /* ---------------------------------------------------------------
+         Same design language as the app: rose gradient mark, layered
+         shadows, tight tracking on display type. No build step, no
+         external requests — one file that GitHub Pages serves as-is.
+         --------------------------------------------------------------- */
+      :root {
+        --bg: #fafafa;
+        --surface: rgb(255 255 255 / 0.88);
+        --border: rgb(24 24 27 / 0.08);
+        --text: #18181b;
+        --muted: #52525b;
+        --faint: #a1a1aa;
+        --accent: #e11d48;
+        --accent-soft: #fb7185;
+        --code-bg: rgb(24 24 27 / 0.05);
+        --shadow:
+          0 1px 2px rgb(24 24 27 / 0.04), 0 8px 24px -10px rgb(24 24 27 / 0.1),
+          0 28px 56px -28px rgb(24 24 27 / 0.14);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #09090b;
+          --surface: rgb(24 24 27 / 0.72);
+          --border: rgb(255 255 255 / 0.08);
+          --text: #fafafa;
+          --muted: #a1a1aa;
+          --faint: #52525b;
+          --code-bg: rgb(255 255 255 / 0.07);
+          --shadow:
+            0 1px 2px rgb(0 0 0 / 0.4), 0 12px 32px -12px rgb(0 0 0 / 0.5),
+            0 32px 64px -32px rgb(0 0 0 / 0.7);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        background-color: var(--bg);
+        background-image:
+          radial-gradient(46rem 26rem at 50% -12rem, rgb(244 63 94 / 0.12), transparent 64%),
+          radial-gradient(32rem 22rem at 88% 2%, rgb(139 92 246 / 0.08), transparent 60%);
+        background-attachment: fixed;
+        color: var(--text);
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          "Helvetica Neue",
+          Arial,
+          sans-serif;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .wrap {
+        width: min(100% - 2.5rem, 62rem);
+        margin-inline: auto;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      /* --- nav ------------------------------------------------------- */
+      .nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1.5rem 0;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        font-weight: 600;
+        letter-spacing: -0.015em;
+        text-decoration: none;
+      }
+
+      .brand svg {
+        width: 2rem;
+        height: 2rem;
+      }
+
+      .nav-link {
+        color: var(--muted);
+        font-size: 0.9rem;
+        font-weight: 500;
+        text-decoration: none;
+        padding: 0.5rem 0.9rem;
+        border-radius: 0.6rem;
+        border: 1px solid var(--border);
+        transition: color 0.15s ease;
+      }
+
+      .nav-link:hover {
+        color: var(--text);
+      }
+
+      /* --- hero ------------------------------------------------------ */
+      .hero {
+        padding: 3.5rem 0 1rem;
+        text-align: center;
+      }
+
+      h1 {
+        font-size: clamp(2.25rem, 6vw, 3.75rem);
+        line-height: 1.05;
+        letter-spacing: -0.035em;
+        font-weight: 700;
+        margin: 0 0 1rem;
+      }
+
+      .lede {
+        font-size: clamp(1rem, 2.2vw, 1.2rem);
+        color: var(--muted);
+        max-width: 34rem;
+        margin: 0 auto 2rem;
+      }
+
+      .cta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        padding: 0.85rem 1.6rem;
+        border-radius: 0.85rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+        text-decoration: none;
+        border: 1px solid transparent;
+        transition:
+          filter 0.16s ease,
+          transform 0.16s ease;
+      }
+
+      .btn-primary {
+        color: #fff;
+        background-image: linear-gradient(180deg, var(--accent-soft) 0%, var(--accent) 100%);
+        box-shadow:
+          inset 0 1px 0 rgb(255 255 255 / 0.28),
+          0 8px 20px -8px rgb(225 29 72 / 0.55);
+      }
+
+      .btn-primary:hover {
+        filter: brightness(1.06);
+      }
+
+      .btn-primary:active {
+        transform: translateY(1px);
+      }
+
+      .btn-ghost {
+        color: var(--text);
+        border-color: var(--border);
+        background: var(--surface);
+      }
+
+      .meta {
+        margin-top: 1rem;
+        font-size: 0.85rem;
+        color: var(--faint);
+      }
+
+      .shot {
+        margin: 3rem auto 0;
+        border-radius: 1rem;
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .shot-dark {
+        display: none;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .shot-light {
+          display: none;
+        }
+        .shot-dark {
+          display: block;
+        }
+      }
+
+      /* --- sections -------------------------------------------------- */
+      section {
+        padding: 4rem 0;
+      }
+
+      h2 {
+        font-size: clamp(1.5rem, 3.5vw, 2rem);
+        letter-spacing: -0.025em;
+        margin: 0 0 0.5rem;
+      }
+
+      .section-lede {
+        color: var(--muted);
+        margin: 0 0 2rem;
+        max-width: 40rem;
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 1rem;
+        padding: 1.5rem;
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(16px);
+      }
+
+      .grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+      }
+
+      .grid h3 {
+        margin: 0 0 0.4rem;
+        font-size: 1rem;
+      }
+
+      .grid p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      /* --- steps ----------------------------------------------------- */
+      ol.steps {
+        list-style: none;
+        counter-reset: step;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: 1rem;
+      }
+
+      ol.steps > li {
+        counter-increment: step;
+        display: grid;
+        grid-template-columns: 2.25rem 1fr;
+        gap: 1rem;
+        align-items: start;
+      }
+
+      ol.steps > li::before {
+        content: counter(step);
+        display: grid;
+        place-items: center;
+        width: 2.25rem;
+        height: 2.25rem;
+        border-radius: 50%;
+        background-image: linear-gradient(180deg, var(--accent-soft) 0%, var(--accent) 100%);
+        color: #fff;
+        font-weight: 700;
+        font-size: 0.9rem;
+      }
+
+      ol.steps h3 {
+        margin: 0.3rem 0 0.3rem;
+        font-size: 1.05rem;
+      }
+
+      ol.steps p {
+        margin: 0 0 0.6rem;
+        color: var(--muted);
+      }
+
+      code,
+      pre {
+        font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+        font-size: 0.85em;
+      }
+
+      code {
+        background: var(--code-bg);
+        padding: 0.15em 0.4em;
+        border-radius: 0.35em;
+      }
+
+      pre {
+        background: var(--code-bg);
+        padding: 0.9rem 1.1rem;
+        border-radius: 0.7rem;
+        overflow-x: auto;
+        margin: 0;
+        line-height: 1.5;
+      }
+
+      pre code {
+        background: none;
+        padding: 0;
+      }
+
+      /* --- notice ---------------------------------------------------- */
+      .notice {
+        border-radius: 1rem;
+        padding: 1.25rem 1.5rem;
+        border: 1px solid rgb(217 119 6 / 0.3);
+        background: rgb(254 243 199 / 0.4);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .notice {
+          background: rgb(69 26 3 / 0.25);
+          border-color: rgb(180 83 9 / 0.35);
+        }
+      }
+
+      .notice h2 {
+        font-size: 1.05rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .notice p {
+        margin: 0 0 0.6rem;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+
+      .notice p:last-child {
+        margin-bottom: 0;
+      }
+
+      /* --- footer ---------------------------------------------------- */
+      footer {
+        border-top: 1px solid var(--border);
+        padding: 2.5rem 0 4rem;
+        color: var(--faint);
+        font-size: 0.85rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 1.5rem;
+        justify-content: space-between;
+      }
+
+      footer a {
+        color: var(--muted);
+        text-decoration: none;
+      }
+
+      footer a:hover {
+        color: var(--text);
+        text-decoration: underline;
+      }
+
+      :focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 3px;
+        border-radius: 0.4rem;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="wrap">
+      <nav class="nav">
+        <a class="brand" href="./">
+          <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="m" x1="4" y1="2" x2="28" y2="30" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#fb7185" />
+                <stop offset="1" stop-color="#e11d48" />
+              </linearGradient>
+            </defs>
+            <rect width="32" height="32" rx="9" fill="url(#m)" />
+            <path
+              d="M10.4 9.4h11.2L16 17.4z"
+              fill="#fff"
+              stroke="#fff"
+              stroke-width="2"
+              stroke-linejoin="round"
+            />
+            <path d="M10.6 22.4h10.8" stroke="#fff" stroke-width="2.6" stroke-linecap="round" />
+          </svg>
+          YT Tools
+        </a>
+        <a class="nav-link" href="https://github.com/thomashendrixkw-code/yttools">GitHub</a>
+      </nav>
+
+      <main>
+        <section class="hero">
+          <h1>Download YouTube video<br />or extract audio</h1>
+          <p class="lede">
+            A free macOS app that saves videos as MP4 or pulls just the audio as MP3. Everything
+            runs on your Mac — no account, no server, nothing kept.
+          </p>
+
+          <div class="cta-row">
+            <a
+              class="btn btn-primary"
+              href="https://github.com/thomashendrixkw-code/yttools/releases/latest"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M12 3v12" />
+                <path d="m7 11 5 5 5-5" />
+                <path d="M4 19h16" />
+              </svg>
+              Download for macOS
+            </a>
+            <a class="btn btn-ghost" href="#build">Build from source</a>
+          </div>
+
+          <p class="meta">Version 1.0.0 · 119 MB · macOS 11 or later · Apple Silicon</p>
+
+          <img
+            class="shot shot-light"
+            src="screenshot-light.png"
+            alt="YT Tools showing a fetched video with its thumbnail, duration and a resolution picker"
+            width="2200"
+            height="2314"
+          />
+          <img
+            class="shot shot-dark"
+            src="screenshot-dark.png"
+            alt="The same screen in dark mode"
+            width="2200"
+            height="2314"
+          />
+        </section>
+
+        <section id="install">
+          <h2>Installing</h2>
+          <p class="section-lede">
+            Three steps. The app is not signed with an Apple Developer ID, so macOS asks once —
+            step&nbsp;3 is how you answer it.
+          </p>
+
+          <div class="card">
+            <ol class="steps">
+              <li>
+                <div>
+                  <h3>Open the DMG</h3>
+                  <p>Download it above and double-click the file.</p>
+                </div>
+              </li>
+              <li>
+                <div>
+                  <h3>Drag YT Tools into Applications</h3>
+                  <p>The window shows both — drag the icon onto the Applications folder.</p>
+                </div>
+              </li>
+              <li>
+                <div>
+                  <h3>Right-click the app, then choose Open</h3>
+                  <p>
+                    Confirm in the dialog. This is needed once, because the app is unsigned. If you
+                    prefer the terminal:
+                  </p>
+                  <pre><code>xattr -dr com.apple.quarantine "/Applications/YT Tools.app"</code></pre>
+                </div>
+              </li>
+            </ol>
+          </div>
+        </section>
+
+        <section>
+          <h2>What it does</h2>
+          <p class="section-lede">
+            Paste a link, pick a quality, get a file. The parts that are usually fiddly are handled.
+          </p>
+
+          <div class="grid">
+            <div class="card">
+              <h3>MP4 at any available resolution</h3>
+              <p>
+                Every resolution the video actually offers, each labelled with a size estimate.
+                H.264 by default so it plays anywhere.
+              </p>
+            </div>
+            <div class="card">
+              <h3>MP3 at 128, 192 or 320 kbps</h3>
+              <p>Title, date and genre copied into the tags, so your library stays tidy.</p>
+            </div>
+            <div class="card">
+              <h3>Smaller files, faster</h3>
+              <p>
+                One checkbox picks YouTube's AV1 or VP9 rendition instead — about half the bytes at
+                the same resolution.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Playlists as a ZIP</h3>
+              <p>
+                Tick the entries you want. A video that fails is skipped and listed, not allowed to
+                sink the batch.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Straight to Downloads</h3>
+              <p>
+                Files land in <code>~/Downloads</code> with a notification. Nothing is ever
+                overwritten.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Nothing leaves your Mac</h3>
+              <p>
+                No account, no telemetry, no server. Downloads use your own connection, and temp
+                files are deleted immediately.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2>Nothing else to install</h2>
+          <p class="section-lede">
+            Tools like this normally ask you to install yt-dlp, ffmpeg and a Python that is new
+            enough. All three are inside the app.
+          </p>
+          <div class="grid">
+            <div class="card">
+              <h3>yt-dlp</h3>
+              <p>The downloader, kept current with each release.</p>
+            </div>
+            <div class="card">
+              <h3>ffmpeg</h3>
+              <p>Merges video with audio and encodes MP3.</p>
+            </div>
+            <div class="card">
+              <h3>Python 3.12</h3>
+              <p>yt-dlp needs 3.10 or newer; macOS only ships 3.9.</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="build">
+          <h2>Build it yourself</h2>
+          <p class="section-lede">
+            The whole thing is open source under the MIT licence. Building takes a few minutes and
+            needs Node 20 or newer.
+          </p>
+          <div class="card">
+            <pre><code>git clone https://github.com/thomashendrixkw-code/yttools.git
+cd yttools
+npm ci
+
+cd desktop
+npm install
+npm run dist        # → desktop/dist/YT Tools-1.0.0-arm64.dmg</code></pre>
+          </div>
+          <p class="meta" style="margin-top: 1rem">
+            There is also a Docker image if you would rather
+            <a href="https://github.com/thomashendrixkw-code/yttools/blob/main/docs/DEPLOYMENT.md"
+              >run it on a server</a
+            >.
+          </p>
+        </section>
+
+        <section>
+          <div class="notice">
+            <h2>Use this only for content you have the right to download</h2>
+            <p>
+              That means material you own the rights to, that is in the public domain, or that
+              carries a licence permitting reuse — Creative Commons, for example. Downloading
+              copyrighted content without the rights holder's permission may breach YouTube's Terms
+              of Service and copyright law in your jurisdiction. You are responsible for how you use
+              this tool.
+            </p>
+            <p>
+              YT Tools does not circumvent DRM, age verification, or regional restrictions, and no
+              such feature will be added.
+            </p>
+          </div>
+        </section>
+      </main>
+
+      <footer>
+        <span>MIT licensed · Bundles yt-dlp (Unlicense) and FFmpeg (LGPL 2.1)</span>
+        <span>
+          <a href="https://github.com/thomashendrixkw-code/yttools">Source</a> ·
+          <a href="https://github.com/thomashendrixkw-code/yttools/blob/main/docs/DESKTOP.md"
+            >Docs</a
+          >
+          ·
+          <a href="https://github.com/thomashendrixkw-code/yttools/issues">Report an issue</a>
+        </span>
+      </footer>
+    </div>
+  </body>
+</html>

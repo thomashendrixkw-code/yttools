@@ -71,6 +71,8 @@ pick. Nothing is ever stored on the server.
 
 ### macOS app (easiest)
 
+**[Download page →](https://thomashendrixkw-code.github.io/yttools/)**
+
 A `.dmg` that bundles the server, a Python runtime, yt-dlp and ffmpeg — nothing to install,
 nothing to configure, and it downloads from your own connection rather than a datacenter IP.
 
