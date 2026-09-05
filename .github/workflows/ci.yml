@@ -91,6 +91,19 @@ jobs:
             -d '{"url":"https://evil.example.com/watch?v=abc"}' | grep -q '^400$'
           jq -e '.error.code == "INVALID_URL"' body.json
 
+      # The release workflow publishes linux/amd64 *and* linux/arm64, but this
+      # job only ever built the runner's own architecture — which is how an
+      # x86_64-only yt-dlp binary reached a tag before anything noticed.
+      # Emulated, so build only: running it under QEMU is slow and flaky.
+      - name: Build for linux/arm64 as well
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          platforms: linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
       - name: Container logs
         if: always()
         run: docker logs yttools || true

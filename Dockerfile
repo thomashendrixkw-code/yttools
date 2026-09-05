@@ -42,11 +42,14 @@ RUN apt-get update \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install yt-dlp from the official standalone binary rather than pip: it is
-# self-contained, updates independently of the distro, and is the build the
-# project actually tests against.
+# yt-dlp as its pure-Python zipapp, run by the distro's Python 3.11.
+#
+# Not the `yt-dlp_linux` standalone binary: that one is x86_64 only, so the
+# multi-arch release build failed on linux/arm64 with exit code 127. The zipapp
+# is architecture-independent, 2.9 MB instead of 35 MB, and starts in under a
+# second rather than unpacking a PyInstaller bundle on every invocation.
 ARG YT_DLP_VERSION=2026.08.19
-RUN curl -fsSL "https://github.com/yt-dlp/yt-dlp/releases/download/${YT_DLP_VERSION}/yt-dlp_linux" \
+RUN curl -fsSL "https://github.com/yt-dlp/yt-dlp/releases/download/${YT_DLP_VERSION}/yt-dlp" \
         -o /usr/local/bin/yt-dlp \
     && chmod a+rx /usr/local/bin/yt-dlp \
     && /usr/local/bin/yt-dlp --version

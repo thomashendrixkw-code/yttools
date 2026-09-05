@@ -3,6 +3,8 @@ name: Release
 on:
   push:
     tags: ["v*.*.*"]
+  # So a failed publish can be retried without moving a tag.
+  workflow_dispatch:
 
 permissions:
   contents: read
