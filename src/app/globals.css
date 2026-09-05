@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+/* Class-based dark mode: the toggle writes `dark` onto <html>, and the inline
+   script in layout.tsx applies it before first paint to avoid a flash. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+}
+
+:root {
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-zinc-50 text-zinc-900 antialiased;
+  @apply dark:bg-zinc-950 dark:text-zinc-100;
+}
+
+/* Ambient background wash — subtle, and cheap enough to keep on mobile. */
+.app-backdrop {
+  background-image:
+    radial-gradient(60rem 30rem at 50% -10rem, rgb(244 63 94 / 0.13), transparent 70%),
+    radial-gradient(40rem 24rem at 90% 10%, rgb(99 102 241 / 0.09), transparent 70%);
+}
+
+/* Indeterminate progress: a travelling sliver for phases with no percentage
+   (merging, MP3 conversion, ZIP packaging). */
+@keyframes indeterminate-slide {
+  0% {
+    transform: translateX(-100%) scaleX(0.4);
+  }
+  50% {
+    transform: translateX(20%) scaleX(0.7);
+  }
+  100% {
+    transform: translateX(220%) scaleX(0.4);
+  }
+}
+
+.animate-indeterminate {
+  animation: indeterminate-slide 1.5s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  transform-origin: left center;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-toast-in {
+  animation: toast-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-indeterminate,
+  .animate-toast-in {
+    animation: none;
+  }
+}
+
+/* Native selects keep their platform behaviour (great on mobile) but lose the
+   default chrome so they match the rest of the controls. */
+.select-reset {
+  appearance: none;
+  background-image: none;
+}

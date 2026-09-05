@@ -1,0 +1,26 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # Next, React and their types move together; separate PRs just conflict.
+      next:
+        patterns: ["next", "react", "react-dom", "@types/react", "@types/react-dom"]
+      dev-tooling:
+        patterns: ["eslint*", "prettier", "vitest", "@vitest/*", "typescript"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+
+  # yt-dlp is pinned in the Dockerfile rather than here — see README. Dependabot
+  # still watches the Node base image.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly

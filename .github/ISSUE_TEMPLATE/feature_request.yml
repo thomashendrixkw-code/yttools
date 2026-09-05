@@ -1,0 +1,30 @@
+name: Feature request
+description: Suggest an addition or a change.
+labels: [enhancement]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Note that anything circumventing DRM, age verification, or regional
+        restrictions is out of scope and will be closed. See SECURITY.md.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the situation you are in, not the solution you want.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What have you considered instead?

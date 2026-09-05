@@ -1,0 +1,66 @@
+name: Bug report
+description: Something does not work the way it should.
+labels: [bug]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing: run the URL through yt-dlp directly
+        (`yt-dlp -J "<url>"`). If that fails too, the bug is upstream —
+        see the link on the previous screen.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what you got instead.
+    validations:
+      required: true
+
+  - type: input
+    id: url
+    attributes:
+      label: URL used
+      description: Only if it is public. Redact it otherwise and say so.
+      placeholder: https://www.youtube.com/watch?v=...
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part?
+      options:
+        - Fetching metadata
+        - MP4 download
+        - MP3 extraction
+        - Playlist / ZIP
+        - Progress bar
+        - UI / layout
+        - Deployment (Docker)
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: health
+    attributes:
+      label: Output of GET /api/health
+      description: "`curl -s localhost:3000/api/health`"
+      render: json
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Server logs
+      description: Anything the server printed around the failure.
+      render: shell
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: macOS 15 / Node 22 / Docker image v1.0.0
+    validations:
+      required: true

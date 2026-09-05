@@ -1,0 +1,6 @@
+* text=auto eol=lf
+
+package-lock.json linguist-generated=true
+*.ts  text
+*.tsx text
+*.css text

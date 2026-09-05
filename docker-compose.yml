@@ -1,0 +1,17 @@
+services:
+  yttools:
+    build: .
+    image: yttools:latest
+    ports:
+      - "3000:3000"
+    environment:
+      # See .env.example for the full list of supported variables.
+      RATE_LIMIT_MAX: "10"
+      RATE_LIMIT_WINDOW_MS: "60000"
+      DOWNLOAD_TIMEOUT_MS: "900000"
+      MAX_PLAYLIST_ITEMS: "25"
+    # Downloads land in the container's temp directory and are deleted as soon
+    # as they have been streamed out. A tmpfs keeps them off disk entirely.
+    tmpfs:
+      - /tmp:size=8g
+    restart: unless-stopped
