@@ -148,12 +148,16 @@ if (existsSync(path.join(pythonDir, ...PYTHON_EXE))) {
 
 step("Pruning the Python runtime");
 {
-  // A CPython install carries a lot that yt-dlp never touches. Everything
-  // below is removed deliberately; __pycache__ is deliberately *kept*, since
-  // the bundle is read-only and Python would otherwise recompile the stdlib
-  // on every launch.
-  const lib = path.join(pythonDir, "lib");
-  const stdlib = path.join(lib, "python3.12");
+  // A CPython install carries a lot that yt-dlp never touches. __pycache__ is
+  // deliberately *kept*: the bundle is read-only, so Python would otherwise
+  // recompile the stdlib on every launch.
+  //
+  // Paths are spelled out per platform rather than pattern-matched. A loose
+  // regex over `lib/` deleted threading.py on Windows, where the filesystem is
+  // case-insensitive and `lib` resolves to the stdlib's `Lib`.
+  const stdlib = IS_WINDOWS
+    ? path.join(pythonDir, "Lib")
+    : path.join(pythonDir, "lib", "python3.12");
   const before = dirSize(pythonDir);
 
   const doomed = [
@@ -165,20 +169,31 @@ step("Pruning the Python runtime");
     path.join(stdlib, "turtledemo"),
     path.join(stdlib, "tkinter"),
     path.join(stdlib, "test"),
-    path.join(pythonDir, "include"),
-    path.join(pythonDir, "share"),
   ];
-  // Launcher scripts for the modules just removed; they would only fail.
-  const pyBin = path.join(pythonDir, "bin");
-  if (existsSync(pyBin)) {
-    for (const entry of readdirSync(pyBin)) {
-      if (/^(2to3|idle3?|pydoc3?|pip3?)/.test(entry)) doomed.push(path.join(pyBin, entry));
-    }
-  }
 
-  // Tcl/Tk exists only for tkinter, which went with the list above.
-  for (const entry of readdirSync(lib)) {
-    if (/^(tcl|tk|libtcl|libtk|itcl|thread)/i.test(entry)) doomed.push(path.join(lib, entry));
+  if (IS_WINDOWS) {
+    doomed.push(path.join(pythonDir, "tcl"));
+    for (const dll of ["_tkinter.pyd", "tcl86t.dll", "tk86t.dll"]) {
+      doomed.push(path.join(pythonDir, "DLLs", dll));
+    }
+  } else {
+    doomed.push(path.join(pythonDir, "include"), path.join(pythonDir, "share"));
+
+    // Tcl/Tk artefacts sit directly in lib/ on macOS. The trailing digit is
+    // what keeps this off stdlib modules: "thread2.8.10" matches, but
+    // "threading.py" does not.
+    const lib = path.join(pythonDir, "lib");
+    for (const entry of readdirSync(lib)) {
+      if (/^(lib)?(tcl|tk|itcl|thread)[0-9]/i.test(entry)) doomed.push(path.join(lib, entry));
+    }
+
+    // Launcher scripts for the modules just removed; they would only fail.
+    const pyBin = path.join(pythonDir, "bin");
+    if (existsSync(pyBin)) {
+      for (const entry of readdirSync(pyBin)) {
+        if (/^(2to3|idle3?|pydoc3?|pip3?)/.test(entry)) doomed.push(path.join(pyBin, entry));
+      }
+    }
   }
 
   for (const target of doomed) rmSync(target, { recursive: true, force: true });
@@ -188,6 +203,16 @@ step("Pruning the Python runtime");
     `    ${(before / 1048576).toFixed(0)} MiB -> ${(after / 1048576).toFixed(0)} MiB` +
       `  (saved ${((before - after) / 1048576).toFixed(0)} MiB)`,
   );
+}
+
+// Pruning is the one step that can quietly break the interpreter, so prove the
+// modules yt-dlp actually needs still import before going any further.
+{
+  const pythonExe = path.join(pythonDir, ...PYTHON_EXE);
+  const probe =
+    "import threading, ssl, json, sqlite3, ctypes, email, http.cookiejar, urllib.request";
+  execFileSync(pythonExe, ["-c", probe], { stdio: "inherit" });
+  console.log("    stdlib probe: ok");
 }
 
 step("Fetching the yt-dlp zipapp");
