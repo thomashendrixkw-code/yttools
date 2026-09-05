@@ -6,6 +6,15 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # archiver 8 is a class-based ESM rewrite with no published types, while
+      # @types/archiver still describes the v6/v7 factory API. Upgrading passes
+      # typecheck and then throws "archiver is not a function" at runtime — in
+      # the playlist ZIP path, which unit tests cannot reach because it needs
+      # yt-dlp and a live YouTube request. Revisit when archiver ships types.
+      - dependency-name: archiver
+        update-types: ["version-update:semver-major"]
+
     groups:
       # Next, React and their types move together; separate PRs just conflict.
       next:
