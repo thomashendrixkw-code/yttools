@@ -16,6 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Codespaces without manual setup.
 - App icon, so `/favicon.ico` no longer 404s.
 
+### Changed
+
+- New brand mark: a downward triangle over a tray bar, on a gradient squircle.
+  The previous icon was a red rounded square containing a white play triangle —
+  effectively YouTube's own mark, which this project should not imitate.
+- Visual refresh throughout: layered surface shadows, a gradient primary action,
+  a sliding tab indicator, a tighter type scale, and a calmer legal panel.
+
 ### Fixed
 
 - yt-dlp's stderr is now logged server-side on failure. It was discarded

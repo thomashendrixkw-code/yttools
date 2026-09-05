@@ -23,8 +23,7 @@ interface DownloadPanelProps {
   disabled?: boolean;
 }
 
-const SELECT_CLASSES =
-  "select-reset w-full rounded-xl border border-zinc-200 bg-white py-3 pl-4 pr-10 text-sm font-medium text-zinc-900 shadow-sm transition focus:border-rose-400 focus:outline-none focus:ring-4 focus:ring-rose-500/10 disabled:opacity-60 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-rose-500";
+const SELECT_CLASSES = "field select-reset py-3 pl-4 pr-10 font-medium disabled:opacity-60";
 
 /** Format / quality picker plus the download action and its progress read-out. */
 export function DownloadPanel({
@@ -52,7 +51,7 @@ export function DownloadPanel({
         <div>
           <label
             htmlFor="quality-select"
-            className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+            className="mb-2 block text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-zinc-500 dark:text-zinc-400"
           >
             {mode === "video" ? "Resolution" : "Bitrate"}
           </label>
@@ -118,11 +117,9 @@ export function DownloadPanel({
           // Cancel must always stay clickable, even when the start conditions
           // that gate the download button no longer hold.
           disabled={busy ? false : disabled || noVideoFormats}
-          className={
-            busy
-              ? "inline-flex h-[46px] items-center justify-center gap-2 rounded-xl border border-zinc-300 bg-white px-6 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
-              : "inline-flex h-[46px] items-center justify-center gap-2 rounded-xl bg-rose-600 px-6 text-sm font-semibold text-white shadow-sm shadow-rose-600/20 transition hover:bg-rose-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
-          }
+          className={`inline-flex h-[46px] items-center justify-center gap-2 rounded-xl px-6 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500 ${
+            busy ? "btn-neutral" : "btn-primary text-white disabled:cursor-not-allowed"
+          }`}
         >
           {busy ? (
             <>
@@ -169,8 +166,17 @@ function ModeTabs({
     <div
       role="tablist"
       aria-label="Download format"
-      className="grid grid-cols-2 gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-900"
+      className="inset-panel relative grid grid-cols-2 gap-1 rounded-xl p-1"
     >
+      {/* One travelling pill rather than two swapped backgrounds — the movement
+          is what tells you the tabs are two states of a single control. */}
+      <span
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-lg bg-white shadow-sm ring-1 ring-zinc-900/5 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] dark:bg-zinc-800 dark:ring-white/10 ${
+          mode === "audio" ? "translate-x-[calc(100%+0.25rem)]" : "translate-x-0"
+        }`}
+      />
+
       {tabs.map(({ id, label, Icon }) => {
         const selected = mode === id;
         return (
@@ -181,10 +187,10 @@ function ModeTabs({
             aria-selected={selected}
             disabled={disabled}
             onClick={() => onChange(id)}
-            className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500 disabled:cursor-not-allowed disabled:opacity-60 ${
+            className={`relative z-10 inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500 disabled:cursor-not-allowed disabled:opacity-60 ${
               selected
-                ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-zinc-50"
-                : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
+                ? "text-zinc-900 dark:text-zinc-50"
+                : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
             }`}
           >
             <Icon className="size-4" />
@@ -230,8 +236,8 @@ function ProgressReadout({ state }: { state: DownloadState }) {
     .join(" · ");
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white/60 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
-      <div className="mb-2 flex items-baseline justify-between gap-3">
+    <div className="inset-panel animate-reveal rounded-xl p-4">
+      <div className="mb-2.5 flex items-baseline justify-between gap-3">
         <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
           {label}
           <span className="ml-2 text-xs font-normal text-zinc-500">
@@ -251,20 +257,20 @@ function ProgressReadout({ state }: { state: DownloadState }) {
         aria-valuemin={0}
         aria-valuemax={100}
         {...(percent !== null ? { "aria-valuenow": percent } : {})}
-        className="h-2 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800"
+        className="h-2 w-full overflow-hidden rounded-full bg-zinc-200/80 dark:bg-zinc-800"
       >
         {percent !== null ? (
           <div
-            className="h-full rounded-full bg-rose-600 transition-[width] duration-300 ease-out"
+            className="h-full rounded-full bg-gradient-to-r from-rose-400 to-rose-600 transition-[width] duration-300 ease-out"
             style={{ width: `${percent}%` }}
           />
         ) : (
-          <div className="animate-indeterminate h-full w-full rounded-full bg-rose-600" />
+          <div className="animate-indeterminate h-full w-full rounded-full bg-gradient-to-r from-rose-400 to-rose-600" />
         )}
       </div>
 
       {meta && !transferring ? (
-        <p className="mt-2 text-xs tabular-nums text-zinc-500 dark:text-zinc-500">{meta}</p>
+        <p className="mt-2.5 text-xs tabular-nums text-zinc-500 dark:text-zinc-500">{meta}</p>
       ) : null}
     </div>
   );

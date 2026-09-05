@@ -21,14 +21,161 @@
 body {
   @apply bg-zinc-50 text-zinc-900 antialiased;
   @apply dark:bg-zinc-950 dark:text-zinc-100;
+  /* Stops sub-pixel jitter on the translating tab indicator in Safari. */
+  text-rendering: optimizeLegibility;
 }
 
-/* Ambient background wash — subtle, and cheap enough to keep on mobile. */
+/* ------------------------------------------------------------------ *
+ * Ambient background
+ *
+ * Three offset colour washes rather than one: a single radial reads as a
+ * gradient, several overlapping ones read as light in a room.
+ * ------------------------------------------------------------------ */
+
 .app-backdrop {
   background-image:
-    radial-gradient(60rem 30rem at 50% -10rem, rgb(244 63 94 / 0.13), transparent 70%),
-    radial-gradient(40rem 24rem at 90% 10%, rgb(99 102 241 / 0.09), transparent 70%);
+    radial-gradient(46rem 26rem at 50% -9rem, rgb(244 63 94 / 0.11), transparent 64%),
+    radial-gradient(32rem 22rem at 88% 3%, rgb(139 92 246 / 0.07), transparent 60%),
+    radial-gradient(28rem 20rem at 6% 16%, rgb(251 146 60 / 0.05), transparent 58%);
+  background-attachment: fixed;
 }
+
+.dark .app-backdrop {
+  background-image:
+    radial-gradient(46rem 26rem at 50% -9rem, rgb(244 63 94 / 0.16), transparent 64%),
+    radial-gradient(32rem 22rem at 88% 3%, rgb(139 92 246 / 0.11), transparent 60%),
+    radial-gradient(28rem 20rem at 6% 16%, rgb(251 146 60 / 0.06), transparent 58%);
+}
+
+/* ------------------------------------------------------------------ *
+ * Surfaces
+ *
+ * Layered shadows — a tight contact shadow plus two progressively wider,
+ * softer ones — read as a card resting on the page. A single large shadow
+ * reads as a drop shadow in a graphics program.
+ * ------------------------------------------------------------------ */
+
+.surface {
+  background-color: rgb(255 255 255 / 0.88);
+  border: 1px solid rgb(24 24 27 / 0.06);
+  box-shadow:
+    0 1px 2px rgb(24 24 27 / 0.04),
+    0 8px 24px -10px rgb(24 24 27 / 0.1),
+    0 28px 56px -28px rgb(24 24 27 / 0.14);
+  backdrop-filter: blur(16px);
+}
+
+.dark .surface {
+  background-color: rgb(24 24 27 / 0.72);
+  border-color: rgb(255 255 255 / 0.07);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.4),
+    0 12px 32px -12px rgb(0 0 0 / 0.5),
+    0 32px 64px -32px rgb(0 0 0 / 0.7);
+}
+
+/* A recessed panel for content nested inside a surface. */
+.inset-panel {
+  background-color: rgb(244 244 245 / 0.7);
+  border: 1px solid rgb(24 24 27 / 0.05);
+}
+
+.dark .inset-panel {
+  background-color: rgb(9 9 11 / 0.5);
+  border-color: rgb(255 255 255 / 0.05);
+}
+
+/* ------------------------------------------------------------------ *
+ * Controls
+ * ------------------------------------------------------------------ */
+
+.field {
+  @apply w-full rounded-xl border text-sm transition;
+  background-color: rgb(255 255 255 / 0.9);
+  border-color: rgb(24 24 27 / 0.1);
+  box-shadow: 0 1px 2px rgb(24 24 27 / 0.04);
+}
+
+.field:focus {
+  outline: none;
+  border-color: rgb(244 63 94 / 0.55);
+  box-shadow:
+    0 1px 2px rgb(24 24 27 / 0.04),
+    0 0 0 4px rgb(244 63 94 / 0.12);
+}
+
+.dark .field {
+  background-color: rgb(9 9 11 / 0.6);
+  border-color: rgb(255 255 255 / 0.09);
+  box-shadow: none;
+}
+
+.dark .field:focus {
+  border-color: rgb(244 63 94 / 0.6);
+  box-shadow: 0 0 0 4px rgb(244 63 94 / 0.16);
+}
+
+/* Primary action. The inner top highlight is what stops a flat fill from
+   looking like a coloured rectangle. */
+.btn-primary {
+  background-image: linear-gradient(180deg, #fb7185 0%, #e11d48 100%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.28),
+    0 1px 2px rgb(190 18 60 / 0.3),
+    0 8px 20px -8px rgb(225 29 72 / 0.55);
+  transition:
+    filter 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.3),
+    0 1px 2px rgb(190 18 60 / 0.3),
+    0 12px 26px -8px rgb(225 29 72 / 0.6);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0.5px);
+  filter: brightness(0.97);
+}
+
+.btn-primary:disabled {
+  filter: saturate(0.5) opacity(0.55);
+  box-shadow: none;
+}
+
+/* Neutral action, used for Fetch and Cancel. */
+.btn-neutral {
+  @apply border transition;
+  background-color: rgb(24 24 27);
+  border-color: rgb(24 24 27);
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
+    0 1px 2px rgb(24 24 27 / 0.2);
+}
+
+.btn-neutral:hover:not(:disabled) {
+  background-color: rgb(39 39 42);
+}
+
+.dark .btn-neutral {
+  background-color: rgb(250 250 250);
+  border-color: rgb(250 250 250);
+  color: rgb(24 24 27);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+}
+
+.dark .btn-neutral:hover:not(:disabled) {
+  background-color: rgb(228 228 231);
+}
+
+/* ------------------------------------------------------------------ *
+ * Motion
+ * ------------------------------------------------------------------ */
 
 /* Indeterminate progress: a travelling sliver for phases with no percentage
    (merging, MP3 conversion, ZIP packaging). */
@@ -64,10 +211,31 @@ body {
   animation: toast-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Result panel easing in once metadata arrives. */
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-reveal {
+  animation: reveal 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-indeterminate,
-  .animate-toast-in {
+  .animate-toast-in,
+  .animate-reveal {
     animation: none;
+  }
+
+  .btn-primary:active:not(:disabled) {
+    transform: none;
   }
 }
 

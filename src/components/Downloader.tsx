@@ -195,28 +195,30 @@ export function Downloader() {
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-10 sm:px-6 sm:py-16">
-      <header className="mb-8 flex items-center justify-between gap-4">
+      <header className="mb-10 flex items-center justify-between gap-4">
         <div className="flex items-center gap-2.5">
-          <LogoIcon className="size-8 text-rose-600" />
-          <span className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+          <LogoIcon className="size-9 drop-shadow-sm" />
+          <span className="text-[1.0625rem] font-semibold tracking-[-0.015em] text-zinc-900 dark:text-zinc-50">
             YT Tools
           </span>
         </div>
         <ThemeToggle />
       </header>
 
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
-          Download video or extract audio
+      <div className="mb-9">
+        <h1 className="text-[2rem] font-bold leading-[1.1] tracking-[-0.03em] text-zinc-900 sm:text-[2.75rem] dark:text-zinc-50">
+          Download video or
+          <br className="hidden sm:block" /> extract audio
         </h1>
-        <p className="mt-2 text-sm leading-relaxed text-zinc-600 sm:text-base dark:text-zinc-400">
-          Paste a YouTube link to save it as an MP4, or pull just the audio as an MP3.
+        <p className="mt-3.5 max-w-md text-[0.9375rem] leading-relaxed text-zinc-600 dark:text-zinc-400">
+          Paste a YouTube link to save it as an MP4, or pull just the audio as an MP3. Nothing is
+          stored on the server.
         </p>
       </div>
 
       <HealthBanner health={health} />
 
-      <div className="rounded-2xl border border-zinc-200 bg-white/80 p-4 shadow-sm backdrop-blur sm:p-6 dark:border-zinc-800 dark:bg-zinc-900/70">
+      <div className="surface rounded-2xl p-4 sm:p-6">
         <UrlForm
           value={url}
           onChange={setUrl}
@@ -226,7 +228,7 @@ export function Downloader() {
         />
 
         {info ? (
-          <div className="mt-6 space-y-6 border-t border-zinc-200 pt-6 dark:border-zinc-800">
+          <div className="animate-reveal mt-6 space-y-6 border-t border-zinc-900/5 pt-6 dark:border-white/10">
             {info.kind === "video" ? (
               <MediaCard video={info.video} />
             ) : (

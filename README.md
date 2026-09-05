@@ -1,9 +1,14 @@
 <div align="center">
 
-# YT Tools
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/logo-dark.png">
+  <img src="docs/logo-light.png" alt="YT Tools — self-hosted YouTube downloader" width="330">
+</picture>
 
-**A self-hosted YouTube downloader.** Paste a link, get an MP4 at the resolution you pick
-or an MP3 at the bitrate you pick. Nothing is ever stored on the server.
+<br>
+
+**Paste a link, get an MP4** at the resolution you pick **or an MP3** at the bitrate you
+pick. Nothing is ever stored on the server.
 
 [![CI](https://github.com/thomashendrixkw-code/yttools/actions/workflows/ci.yml/badge.svg)](https://github.com/thomashendrixkw-code/yttools/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)

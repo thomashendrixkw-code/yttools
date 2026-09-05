@@ -137,12 +137,44 @@ export function SpinnerIcon(props: IconProps) {
   );
 }
 
-/** Wordmark glyph: a play triangle in a rounded square. */
+/**
+ * The brand mark: a downward triangle — a play glyph rotated to point down —
+ * resting on a tray bar. Reads as "media" and "download" at once, and stays
+ * legible at favicon size.
+ *
+ * Deliberately not a red rounded square with a play triangle: that is
+ * effectively YouTube's own mark, which this project should not imitate.
+ */
 export function LogoIcon(props: IconProps) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
-      <rect x="1.5" y="4" width="21" height="16" rx="5" fill="currentColor" />
-      <path d="M10 9.2 15 12l-5 2.8z" fill="#fff" />
+    <svg viewBox="0 0 32 32" fill="none" aria-hidden="true" {...props}>
+      <defs>
+        <linearGradient id="ytt-mark" x1="4" y1="2" x2="28" y2="30" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#fb7185" />
+          <stop offset="1" stopColor="#e11d48" />
+        </linearGradient>
+        <linearGradient
+          id="ytt-sheen"
+          x1="16"
+          y1="0"
+          x2="16"
+          y2="16"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop stopColor="#fff" stopOpacity="0.22" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <rect width="32" height="32" rx="9" fill="url(#ytt-mark)" />
+      <rect width="32" height="32" rx="9" fill="url(#ytt-sheen)" />
+      <path
+        d="M10.4 9.4h11.2L16 17.4z"
+        fill="#fff"
+        stroke="#fff"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path d="M10.6 22.4h10.8" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" />
     </svg>
   );
 }
