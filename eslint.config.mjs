@@ -10,7 +10,17 @@ import next from "eslint-config-next/core-web-vitals";
  */
 const config = [
   {
-    ignores: [".next/**", "node_modules/**", "coverage/**", "next-env.d.ts", ".next/types/**"],
+    ignores: [
+      ".next/**",
+      "node_modules/**",
+      "coverage/**",
+      "next-env.d.ts",
+      ".next/types/**",
+      // Generated: the assembled desktop bundle and its packaged output.
+      "desktop/resources/**",
+      "desktop/dist/**",
+      "desktop/node_modules/**",
+    ],
   },
   ...next,
 ];

@@ -37,6 +37,7 @@ pick. Nothing is ever stored on the server.
 
 - [What it does](#what-it-does)
 - [Quick start](#quick-start)
+- [macOS app](docs/DESKTOP.md)
 - [Requirements](#requirements)
 - [Configuration](#configuration)
 - [How it works](#how-it-works)
@@ -67,6 +68,19 @@ pick. Nothing is ever stored on the server.
 - Dark mode, download history in `localStorage`, and per-IP rate limiting.
 
 ## Quick start
+
+### macOS app (easiest)
+
+A `.dmg` that bundles the server, a Python runtime, yt-dlp and ffmpeg — nothing to install,
+nothing to configure, and it downloads from your own connection rather than a datacenter IP.
+
+```bash
+cd desktop && npm install && npm run dist
+# -> desktop/dist/YT Tools-1.0.0-arm64.dmg
+```
+
+The build is unsigned, so the first launch needs a right-click → Open (or one `xattr`
+command). See **[docs/DESKTOP.md](docs/DESKTOP.md)**.
 
 ### With Docker (recommended)
 

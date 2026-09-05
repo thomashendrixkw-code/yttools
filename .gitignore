@@ -9,3 +9,12 @@ build/
 next-env.d.ts
 tsconfig.tsbuildinfo
 coverage/
+
+# Desktop app: build outputs and the ~166 MB of bundled runtimes/binaries
+desktop/node_modules/
+desktop/dist/
+desktop/resources/
+# ...but the packaging inputs must be tracked; the generic `build/` rule above
+# would otherwise swallow the app icon and the entitlements plist.
+!desktop/build/
+!desktop/build/**

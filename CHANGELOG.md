@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **macOS desktop app.** An Electron shell in `desktop/` that runs the same
+  Next.js server on a loopback port and bundles CPython 3.12, the yt-dlp zipapp
+  and a static ffmpeg, so the `.dmg` has no prerequisites. Downloads land in
+  ~/Downloads with a notification. Built by a manual CI workflow that verifies
+  the bundle actually carries its runtimes.
+
 - "Smaller file" option, selecting YouTube's AV1/VP9 rendition instead of H.264
   at the same resolution: roughly half the bytes, so a 1080p download finishes in
   about a third less time. Off by default, since H.264 plays on anything.
