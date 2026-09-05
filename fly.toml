@@ -1,0 +1,51 @@
+# Fly.io deployment for YT Tools.
+#
+# The app spawns yt-dlp and ffmpeg and writes large temp files, so it needs a
+# real container — see docs/DEPLOYMENT.md for why serverless platforms cannot
+# host it, and for putting Cloudflare in front of this.
+#
+#   fly launch --no-deploy --copy-config    # then edit `app` and `primary_region`
+#   fly deploy
+
+app = "yttools"
+primary_region = "cdg" # Paris. Pick the region closest to your users.
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "3000"
+  MAX_PLAYLIST_ITEMS = "25"
+  # Our own ceiling stays well above Cloudflare's 125s origin timeout, so that
+  # when something is too slow it is Cloudflare that reports it, not a
+  # half-finished download.
+  DOWNLOAD_TIMEOUT_MS = "900000"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_start_machines = true
+  # `suspend` keeps the machine warm-ish while idle without billing for it. An
+  # in-flight download keeps it awake; only genuinely idle machines suspend.
+  auto_stop_machines = "suspend"
+  min_machines_running = 0
+
+  # Every request can mean a multi-hundred-megabyte download and an ffmpeg
+  # merge. Queue beyond a handful rather than thrashing disk and bandwidth.
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 4
+    hard_limit = 8
+
+[[http_service.checks]]
+  path = "/api/health"
+  method = "GET"
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "20s"
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "2gb"
+  # Temp files live on the machine's root disk. Size it for the largest video
+  # you expect times your concurrency: a 4K download can exceed 1.5 GB.

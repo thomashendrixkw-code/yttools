@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   at the same resolution: roughly half the bytes, so a 1080p download finishes in
   about a third less time. Off by default, since H.264 plays on anything.
 - `GET /api/download`, so the browser can stream a download straight to disk.
+- Deployment configs for Fly.io, Render and Railway, plus `docs/DEPLOYMENT.md`
+  covering sizing and running behind Cloudflare — notably that Cloudflare's
+  125s origin timeout makes 4K downloads return a 524 on a proxied record,
+  since the server produces the whole file before sending a byte.
 - Metadata extraction is cached between `/api/info` and `/api/download`
   (`--load-info-json`), removing a duplicated 2-4s extraction per download.
 

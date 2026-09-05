@@ -345,9 +345,16 @@ options interleaved in a single run, never across sessions.
 
 ## Deployment
 
-Standard Vercel serverless and edge functions **cannot** run this: they have no `yt-dlp` or
-`ffmpeg`, and their execution limits rule out long downloads. Use the Docker image on
-Railway, Fly.io, Render, or any VPS.
+**Serverless platforms cannot host this** — Cloudflare Pages/Workers, Vercel functions and
+Netlify functions alike. The app spawns `yt-dlp` and `ffmpeg` and writes large temp files;
+Workers has neither a process model nor a filesystem, and no adapter works around that. Use
+the Docker image on Fly.io, Render, Railway, or any VPS.
+
+Ready-made configs are included: `fly.toml`, `render.yaml`, `railway.json`.
+See **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** for step-by-step instructions, sizing, and
+**putting Cloudflare in front** — including the 125-second origin timeout that makes 4K
+downloads fail behind a proxied record, and how to authenticate the app with Cloudflare
+Access.
 
 ```bash
 docker compose up --build -d

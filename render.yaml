@@ -1,0 +1,17 @@
+# Render blueprint for YT Tools. See docs/DEPLOYMENT.md.
+services:
+  - type: web
+    name: yttools
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter # `free` has too little disk for large downloads
+    region: frankfurt
+    healthCheckPath: /api/health
+    autoDeploy: false
+    envVars:
+      - key: PORT
+        value: "3000"
+      - key: MAX_PLAYLIST_ITEMS
+        value: "25"
+      - key: DOWNLOAD_TIMEOUT_MS
+        value: "900000"
