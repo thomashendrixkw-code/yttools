@@ -42,7 +42,8 @@ The installer is per-user, so it needs no administrator rights.
 | Next.js server        | ~18 MB  | The same server that runs in Docker                       |
 | yt-dlp zipapp         | ~3 MB   | The downloader itself                                     |
 
-DMG around 119 MB, installed app around 309 MB.
+DMG around 119 MB (installed app ~309 MB); Windows installer around 107 MB
+(installed ~360 MB, since Chromium's Windows build and its ffmpeg are larger).
 
 ### How it got there
 
