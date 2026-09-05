@@ -1,0 +1,26 @@
+YT Tools
+Copyright (c) 2026 Thomas Hendrickx
+
+Licensed under the MIT License; see LICENSE.
+
+NOTE ON USE
+
+The licence covers the source code of YT Tools. It grants no rights over the
+content the software is used to download.
+
+Use this tool only for material you own the rights to, that is in the public
+domain, or that carries a licence permitting reuse (Creative Commons, for
+example). Downloading copyrighted content without the rights holder's
+permission may breach YouTube's Terms of Service and copyright law in your
+jurisdiction.
+
+This software does not circumvent DRM, age verification, or regional
+restrictions.
+
+---
+
+This product depends on yt-dlp (https://github.com/yt-dlp/yt-dlp), released
+into the public domain under the Unlicense, and on FFmpeg
+(https://ffmpeg.org/), licensed under the LGPL v2.1 or later. Neither is
+bundled with this source; both are installed separately, including by the
+provided Dockerfile.

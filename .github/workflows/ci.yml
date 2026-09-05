@@ -6,10 +6,12 @@ on:
   pull_request:
   workflow_dispatch:
 
-# Cancel superseded runs on the same branch.
+# Cancel superseded pull-request runs, but let every commit that lands on a
+# branch finish its build — otherwise a quick follow-up push silently cancels
+# the Docker job for the commit before it.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
