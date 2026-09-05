@@ -5,7 +5,7 @@
 **A self-hosted YouTube downloader.** Paste a link, get an MP4 at the resolution you pick
 or an MP3 at the bitrate you pick. Nothing is ever stored on the server.
 
-[![CI](https://github.com/thomashendrickx56/yttools/actions/workflows/ci.yml/badge.svg)](https://github.com/thomashendrickx56/yttools/actions/workflows/ci.yml)
+[![CI](https://github.com/thomashendrixkw-code/yttools/actions/workflows/ci.yml/badge.svg)](https://github.com/thomashendrixkw-code/yttools/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A520.9-brightgreen.svg)](.nvmrc)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black.svg)](https://nextjs.org)
@@ -67,7 +67,7 @@ or an MP3 at the bitrate you pick. Nothing is ever stored on the server.
 Everything — Node, Python, `yt-dlp`, `ffmpeg` — is in the image.
 
 ```bash
-git clone https://github.com/thomashendrickx56/yttools.git
+git clone https://github.com/thomashendrixkw-code/yttools.git
 cd yttools
 docker compose up --build
 ```

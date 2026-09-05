@@ -2,7 +2,7 @@ blank_issues_enabled: false
 
 contact_links:
   - name: Security vulnerability
-    url: https://github.com/thomashendrickx56/yttools/security/advisories/new
+    url: https://github.com/thomashendrixkw-code/yttools/security/advisories/new
     about: Report privately. Please do not open a public issue.
   - name: A video will not download
     url: https://github.com/yt-dlp/yt-dlp/issues

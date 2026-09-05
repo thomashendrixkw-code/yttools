@@ -42,5 +42,5 @@ First release.
 - Scratch directories are per-request, deleted when the response stream closes,
   and swept if a crash orphans one.
 
-[unreleased]: https://github.com/thomashendrickx56/yttools/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/thomashendrickx56/yttools/releases/tag/v1.0.0
+[unreleased]: https://github.com/thomashendrixkw-code/yttools/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/thomashendrixkw-code/yttools/releases/tag/v1.0.0
