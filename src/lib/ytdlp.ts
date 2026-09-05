@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 
-import { requireBinary, resolveBinary } from "./binaries";
+import { requireBinary, resolveBinary, ytDlpPrefixArgs } from "./binaries";
 import { AppError, fromYtDlpStderr } from "./errors";
 import { dropInfo, lookupInfo, storeInfo } from "./info-cache";
 import { findOutputFile } from "./temp";
@@ -40,7 +40,7 @@ async function runYtDlp({ args, timeoutMs, signal, onStdoutLine }: RunOptions): 
   const ytDlp = await requireBinary("yt-dlp");
 
   return new Promise<RunResult>((resolve, reject) => {
-    const child = spawn(ytDlp.path, args, {
+    const child = spawn(ytDlp.path, [...ytDlpPrefixArgs(), ...args], {
       signal,
       env: { ...process.env, NO_COLOR: "1" },
       stdio: ["ignore", "pipe", "pipe"],

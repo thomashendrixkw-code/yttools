@@ -50,12 +50,33 @@ async function searchPath(name: string): Promise<string | null> {
   return null;
 }
 
+/**
+ * Arguments to place before every yt-dlp invocation.
+ *
+ * The desktop build ships a Python interpreter plus yt-dlp as a zipapp, so
+ * `YT_DLP_PATH` is the interpreter and this is the script it must run. Going
+ * through a shell wrapper instead would not work on Windows, where Node
+ * refuses to spawn `.cmd` files without `shell: true`.
+ */
+export function ytDlpPrefixArgs(): string[] {
+  const raw = process.env.YT_DLP_PREFIX_ARGS;
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((a): a is string => typeof a === "string") : [];
+  } catch {
+    console.error("[binaries] YT_DLP_PREFIX_ARGS is not a JSON array; ignoring it");
+    return [];
+  }
+}
+
 /** Ask a binary for its version string; failure is non-fatal. */
 async function readVersion(binPath: string, name: BinaryName): Promise<string | null> {
   try {
     // ffmpeg uses a single dash and rejects `--version`; yt-dlp wants two.
     const flag = name === "ffmpeg" ? "-version" : "--version";
-    const { stdout } = await execFileAsync(binPath, [flag], { timeout: 10_000 });
+    const argv = name === "yt-dlp" ? [...ytDlpPrefixArgs(), flag] : [flag];
+    const { stdout } = await execFileAsync(binPath, argv, { timeout: 10_000 });
     const first = stdout.trim().split("\n")[0] ?? "";
     // ffmpeg prints "ffmpeg version 6.1.1 Copyright ..."; yt-dlp prints a bare date-version.
     if (name === "ffmpeg") return first.replace(/^ffmpeg version\s*/i, "").split(" ")[0] ?? null;

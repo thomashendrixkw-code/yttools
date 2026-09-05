@@ -1,12 +1,12 @@
-name: Desktop (macOS)
+name: Desktop apps
 
-# Manual only. It downloads Electron, a CPython runtime, yt-dlp and ffmpeg,
-# then produces a ~400 MB app — not something to run on every push.
+# Manual only. Each job downloads Electron, a CPython runtime, yt-dlp and
+# ffmpeg, then produces a 300 MB+ app — not something to run on every push.
 on:
   workflow_dispatch:
     inputs:
       attach_to_release:
-        description: "Tag to attach the DMG to (leave empty to just upload an artifact)"
+        description: "Tag to attach the installers to (leave empty to just upload artifacts)"
         required: false
         type: string
 
@@ -14,9 +14,21 @@ permissions:
   contents: write
 
 jobs:
-  dmg:
-    name: Build DMG
-    runs-on: macos-14 # Apple Silicon
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14 # Apple Silicon
+            label: macOS (arm64)
+            artifact: yttools-macos-arm64
+            installer: desktop/dist/*.dmg
+          - os: windows-latest
+            label: Windows (x64)
+            artifact: yttools-windows-x64
+            installer: desktop/dist/*.exe
 
     steps:
       - uses: actions/checkout@v4
@@ -33,30 +45,46 @@ jobs:
         working-directory: desktop
         run: npm install --no-audit --no-fund
 
-      - name: Build the DMG
+      - name: Build the installer
         working-directory: desktop
         run: npm run dist
 
-      - name: Verify the bundle carries its runtimes
+      # Building proves nothing on its own: the whole point of these bundles is
+      # that yt-dlp and ffmpeg run without anything installed on the machine.
+      # So actually execute them from inside the packaged output.
+      - name: Verify the bundled runtimes execute (macOS)
+        if: runner.os == 'macOS'
         working-directory: desktop
+        shell: bash
         run: |
-          APP="dist/mac-arm64/YT Tools.app/Contents/Resources"
-          test -x "$APP/bin/ffmpeg"            || { echo "ffmpeg missing"; exit 1; }
-          test -f "$APP/bin/yt-dlp.pyz"        || { echo "yt-dlp missing"; exit 1; }
-          test -x "$APP/python/bin/python3"    || { echo "python missing"; exit 1; }
-          test -f "$APP/server/server.js"      || { echo "server missing"; exit 1; }
-          test -f "$APP/bin/ffmpeg.LICENSE"    || { echo "ffmpeg licence missing"; exit 1; }
-          echo "bundle contents verified"
+          R="dist/mac-arm64/YT Tools.app/Contents/Resources"
+          test -f "$R/server/server.js" || { echo "server missing"; exit 1; }
+          test -f "$R/bin/ffmpeg.LICENSE" || { echo "ffmpeg licence missing"; exit 1; }
+          echo "yt-dlp: $("$R/python/bin/python3" "$R/bin/yt-dlp.pyz" --version)"
+          echo "ffmpeg: $("$R/bin/ffmpeg" -version | head -1)"
           ls -lh dist/*.dmg
+
+      - name: Verify the bundled runtimes execute (Windows)
+        if: runner.os == 'Windows'
+        working-directory: desktop
+        shell: bash
+        run: |
+          R="dist/win-unpacked/resources"
+          test -f "$R/server/server.js" || { echo "server missing"; exit 1; }
+          test -f "$R/bin/ffmpeg.LICENSE" || { echo "ffmpeg licence missing"; exit 1; }
+          echo "yt-dlp: $("$R/python/python.exe" "$R/bin/yt-dlp.pyz" --version)"
+          echo "ffmpeg: $("$R/bin/ffmpeg.exe" -version | head -1)"
+          ls -lh dist/*.exe
 
       - uses: actions/upload-artifact@v4
         with:
-          name: yttools-macos-arm64
-          path: desktop/dist/*.dmg
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.installer }}
           retention-days: 14
 
       - name: Attach to release
         if: inputs.attach_to_release != ''
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ inputs.attach_to_release }}" desktop/dist/*.dmg --clobber
+        run: gh release upload "${{ inputs.attach_to_release }}" ${{ matrix.installer }} --clobber

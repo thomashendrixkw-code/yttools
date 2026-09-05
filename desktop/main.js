@@ -23,9 +23,18 @@ const isDev = !app.isPackaged;
 /** Resources live beside the app in production, in this folder in development. */
 const resourcesRoot = isDev ? path.join(__dirname, "resources") : process.resourcesPath;
 
+const isWindows = process.platform === "win32";
+
 const SERVER_ENTRY = path.join(resourcesRoot, "server", "server.js");
-const YT_DLP_PATH = path.join(resourcesRoot, "bin", "yt-dlp");
-const FFMPEG_PATH = path.join(resourcesRoot, "bin", "ffmpeg");
+
+// yt-dlp ships as a pure-Python zipapp run by the bundled interpreter. Pointing
+// the server at a wrapper script instead would not work on Windows, where Node
+// refuses to spawn .cmd files without a shell.
+const PYTHON_PATH = isWindows
+  ? path.join(resourcesRoot, "python", "python.exe")
+  : path.join(resourcesRoot, "python", "bin", "python3");
+const YT_DLP_ZIPAPP = path.join(resourcesRoot, "bin", "yt-dlp.pyz");
+const FFMPEG_PATH = path.join(resourcesRoot, "bin", isWindows ? "ffmpeg.exe" : "ffmpeg");
 
 let serverProcess = null;
 let mainWindow = null;
@@ -76,8 +85,9 @@ async function startServer() {
       NODE_ENV: "production",
       PORT: String(port),
       HOSTNAME: "127.0.0.1",
-      // Point the app at the binaries we ship instead of whatever is on PATH.
-      YT_DLP_PATH,
+      // Point the app at what we ship instead of whatever is on PATH.
+      YT_DLP_PATH: PYTHON_PATH,
+      YT_DLP_PREFIX_ARGS: JSON.stringify([YT_DLP_ZIPAPP]),
       FFMPEG_PATH,
       // ELECTRON_RUN_AS_NODE makes the Electron binary behave as plain Node,
       // so the bundle needs no separate Node runtime.

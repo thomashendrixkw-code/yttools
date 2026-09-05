@@ -7,8 +7,10 @@
   "scripts": {
     "prepare-resources": "node scripts/prepare-resources.mjs",
     "start": "npm run prepare-resources && electron .",
-    "dist": "npm run prepare-resources && electron-builder --mac",
-    "dist:dir": "npm run prepare-resources && electron-builder --mac --dir"
+    "dist": "npm run prepare-resources && electron-builder",
+    "dist:dir": "npm run prepare-resources && electron-builder --dir",
+    "dist:mac": "npm run prepare-resources && electron-builder --mac",
+    "dist:win": "npm run prepare-resources && electron-builder --win"
   },
   "devDependencies": {
     "electron": "^33.0.0",

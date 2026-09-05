@@ -36,7 +36,14 @@ const YT_DLP_ZIPAPP_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/down
 
 const PYTHON_RELEASE = "20260901";
 const PYTHON_VERSION = "3.12.14";
-const PYTHON_TRIPLE = process.arch === "arm64" ? "aarch64-apple-darwin" : "x86_64-apple-darwin";
+const IS_WINDOWS = process.platform === "win32";
+const PYTHON_TRIPLE = IS_WINDOWS
+  ? "x86_64-pc-windows-msvc"
+  : process.arch === "arm64"
+    ? "aarch64-apple-darwin"
+    : "x86_64-apple-darwin";
+/** The Windows archive puts the interpreter at the root, not under bin/. */
+const PYTHON_EXE = IS_WINDOWS ? ["python.exe"] : ["bin", "python3"];
 const PYTHON_URL =
   `https://github.com/astral-sh/python-build-standalone/releases/download/${PYTHON_RELEASE}/` +
   `cpython-${PYTHON_VERSION}+${PYTHON_RELEASE}-${PYTHON_TRIPLE}-install_only_stripped.tar.gz`;
@@ -106,7 +113,7 @@ if (!existsSync(path.join(serverDir, "node_modules", "archiver"))) {
 
 step(`Fetching CPython ${PYTHON_VERSION} (${PYTHON_TRIPLE})`);
 const pythonDir = path.join(resources, "python");
-if (existsSync(path.join(pythonDir, "bin", "python3"))) {
+if (existsSync(path.join(pythonDir, ...PYTHON_EXE))) {
   console.log("    already present, keeping it (delete resources/python to refresh)");
 } else {
   rmSync(pythonDir, { recursive: true, force: true });
@@ -173,19 +180,9 @@ if (existsSync(zipapp)) {
   });
 }
 
-// A shell shim so the app can treat yt-dlp as an ordinary executable and keep
-// using YT_DLP_PATH, with no knowledge of how it is packaged.
-const shim = path.join(binDir, "yt-dlp");
-writeFileSync(
-  shim,
-  `#!/bin/sh
-# Runs the bundled yt-dlp zipapp with the bundled CPython.
-DIR="$(cd "$(dirname "$0")" && pwd)"
-exec "$DIR/../python/bin/python3" "$DIR/yt-dlp.pyz" "$@"
-`,
-);
-chmodSync(shim, 0o755);
-// The standalone binary, if a previous build left one behind, is dead weight.
+// No wrapper script: the app is told to run `python <zipapp>` directly, which
+// works identically on both platforms. See main.js.
+rmSync(path.join(binDir, "yt-dlp"), { force: true });
 rmSync(path.join(binDir, "yt-dlp_macos"), { force: true });
 
 step("Collecting ffmpeg");
@@ -194,7 +191,7 @@ step("Collecting ffmpeg");
 // would break on any machine without it.
 const { default: ffmpegStatic } = await import("ffmpeg-static");
 if (!ffmpegStatic) throw new Error("ffmpeg-static did not resolve a binary for this platform");
-const ffmpegTarget = path.join(binDir, "ffmpeg");
+const ffmpegTarget = path.join(binDir, IS_WINDOWS ? "ffmpeg.exe" : "ffmpeg");
 cpSync(ffmpegStatic, ffmpegTarget);
 chmodSync(ffmpegTarget, 0o755);
 
@@ -205,12 +202,13 @@ if (existsSync(ffmpegLicense)) cpSync(ffmpegLicense, path.join(binDir, "ffmpeg.L
 /* ------------------------------------------------------------------ */
 
 step("Verifying the bundled binaries run");
-for (const [name, bin, flag] of [
-  ["yt-dlp", shim, "--version"],
-  ["ffmpeg", ffmpegTarget, "-version"],
+const pythonExe = path.join(pythonDir, ...PYTHON_EXE);
+for (const [name, bin, args] of [
+  ["yt-dlp", pythonExe, [zipapp, "--version"]],
+  ["ffmpeg", ffmpegTarget, ["-version"]],
 ]) {
   const started = Date.now();
-  const out = execFileSync(bin, [flag], { encoding: "utf8" }).split("\n")[0];
+  const out = execFileSync(bin, args, { encoding: "utf8" }).split("\n")[0];
   const elapsed = ((Date.now() - started) / 1000).toFixed(2);
   console.log(`    ${name.padEnd(7)} ${elapsed.padStart(6)}s  ${out.trim()}`);
 }

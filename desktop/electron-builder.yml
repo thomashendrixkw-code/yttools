@@ -15,8 +15,12 @@ extraResources:
   - from: resources
     to: .
 
-# Prunes the Chromium locale bundles and SwiftShader from inside the Electron
-# framework, which electron-builder's own electronLanguages does not reach.
+# Works on Windows, where the locales are a plain directory. On macOS it only
+# reaches empty stubs, so after-pack.cjs handles the real ones in the framework.
+electronLanguages:
+  - en-US
+
+# Prunes the macOS framework locales and SwiftShader on both platforms.
 afterPack: scripts/after-pack.cjs
 
 mac:
@@ -37,6 +41,23 @@ mac:
   extendInfo:
     NSHumanReadableCopyright: >-
       Bundles yt-dlp (Unlicense) and FFmpeg (LGPL 2.1). See Resources/bin/ffmpeg.LICENSE.
+
+win:
+  icon: build/icon.ico
+  target:
+    - target: nsis
+      arch: [x64]
+  # No code-signing certificate, so Windows SmartScreen will warn on first run.
+  # See docs/DESKTOP.md; signing needs a paid OV/EV certificate.
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: YT Tools
+  # Leaving downloads and settings behind on uninstall would be rude.
+  deleteAppDataOnUninstall: true
 
 dmg:
   title: YT Tools

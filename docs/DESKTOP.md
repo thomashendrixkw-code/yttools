@@ -1,7 +1,8 @@
-# macOS app
+# Desktop apps
 
-A `.dmg` you drag into Applications. It bundles everything — the Next.js server, a Python
-runtime, yt-dlp and ffmpeg — so there is nothing to install and nothing to configure.
+A `.dmg` for macOS and an `.exe` installer for Windows. Both bundle everything — the
+Next.js server, a Python runtime, yt-dlp and ffmpeg — so there is nothing to install and
+nothing to configure.
 
 Running locally is not only convenient. It sidesteps the two things that make a hosted
 deployment awkward: YouTube throttles datacenter IPs hard, and a reverse proxy imposes a
@@ -10,20 +11,26 @@ machine.
 
 ## Installing
 
-Download the DMG, open it, drag **YT Tools** into Applications.
+Neither build is code-signed, so each system warns once. That is the only awkward step.
 
-The build is **not signed with an Apple Developer ID**, so the first launch needs one extra
-step. Either:
+### macOS
 
-- **Right-click the app → Open**, then confirm in the dialog; or
-- clear the quarantine flag once:
+Open the DMG and drag **YT Tools** into Applications. Then either **right-click the app →
+Open** and confirm, or clear the quarantine flag once:
 
-  ```bash
-  xattr -dr com.apple.quarantine "/Applications/YT Tools.app"
-  ```
+```bash
+xattr -dr com.apple.quarantine "/Applications/YT Tools.app"
+```
 
-Without this, macOS reports the app as damaged or from an unidentified developer. Signing it
-properly requires a paid Apple Developer account; see [Signing](#signing-optional).
+Without it, macOS reports the app as damaged or from an unidentified developer.
+
+### Windows
+
+Run `YT Tools Setup 1.0.0.exe`. SmartScreen will show _"Windows protected your PC"_ — click
+**More info**, then **Run anyway**. That warning appears for any installer Microsoft has not
+seen signed; it is not a malware finding.
+
+The installer is per-user, so it needs no administrator rights.
 
 ## What is inside
 
@@ -125,20 +132,38 @@ rm -f  desktop/resources/bin/yt-dlp.pyz   # new yt-dlp
 Keep yt-dlp current — YouTube changes break it regularly, and a bundled copy does not update
 itself.
 
-### Architecture
+### Platforms and architectures
 
-`electron-builder.yml` targets **arm64** only, because `ffmpeg-static` installs a binary for
-the machine doing the build. For an Intel build, run the whole thing on an Intel Mac (or
-under Rosetta) and change the `arch` list. The yt-dlp zipapp and the Python download are
-already architecture-aware.
+`npm run dist` builds for whatever machine you are on; `dist:mac` and `dist:win` are
+explicit. **You cannot cross-build**: `ffmpeg-static` installs the binary for the current
+platform, and an NSIS installer needs Wine when built from macOS. Build each target on its
+own machine, or let CI do it.
+
+Current targets are macOS **arm64** and Windows **x64**. For macOS on Intel, build on an
+Intel Mac and add `x64` to the `arch` list. The yt-dlp zipapp is pure Python, and the
+CPython download is already platform- and architecture-aware.
 
 ### CI
 
-`.github/workflows/desktop.yml` builds the DMG on a macOS runner. It is **manual**
-(`workflow_dispatch`) — a 400 MB app on every push would be wasteful. It verifies the bundle
-actually carries its runtimes before uploading, and can attach the DMG to a release tag.
+`.github/workflows/desktop.yml` builds both installers, on a macOS runner and a Windows
+runner. It is **manual** (`workflow_dispatch`) — a 300 MB app per platform on every push
+would be wasteful.
+
+Building proves little on its own, so each job then **executes the bundled runtimes from
+inside the packaged output** (`python … yt-dlp.pyz --version`, `ffmpeg -version`). That is
+what confirms the promise of the bundle: that neither needs anything installed on the
+machine. It can also attach both installers to a release tag.
 
 ## Signing (optional)
+
+### Windows
+
+SmartScreen stops warning once the installer is signed with an OV or EV certificate from a
+Windows CA. Set `CSC_LINK` and `CSC_KEY_PASSWORD` in the build environment and
+electron-builder picks them up. Note that OV certificates still accrue SmartScreen
+reputation slowly; EV certificates start trusted.
+
+### macOS
 
 With a paid Apple Developer account, in `desktop/electron-builder.yml`:
 
@@ -161,15 +186,24 @@ Users then get no warning at all.
 
 ## Troubleshooting
 
-**"YT Tools is damaged and can't be opened"** — the quarantine flag. See
+**"YT Tools is damaged and can't be opened"** (macOS) — the quarantine flag. See
 [Installing](#installing). The app is not damaged; macOS says this for any unsigned app
 downloaded from the internet.
+
+**"Windows protected your PC"** — SmartScreen, because the installer is unsigned. Click
+**More info** then **Run anyway**.
 
 **The window is blank** — the bundled server failed to start. Launch from a terminal to see
 why:
 
 ```bash
+# macOS
 "/Applications/YT Tools.app/Contents/MacOS/YT Tools"
+```
+
+```powershell
+# Windows
+& "$env:LOCALAPPDATA\Programs\yt-tools\YT Tools.exe"
 ```
 
 **Downloads fail with "YouTube is blocking requests"** — rare on a residential connection,
