@@ -60,7 +60,7 @@ jobs:
       - uses: docker/setup-buildx-action@v3
 
       - name: Build image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: false
@@ -96,7 +96,7 @@ jobs:
       # x86_64-only yt-dlp binary reached a tag before anything noticed.
       # Emulated, so build only: running it under QEMU is slow and flaky.
       - name: Build for linux/arm64 as well
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: false
